@@ -66,10 +66,10 @@ impl Collector for CpuUsageCollector {
         let core_usage = self.core_usage.clone();
 
         tokio::task::spawn_blocking(move || match system.lock() {
-            Err(e) => {
+            Err(error) => {
                 tracing::error!(
                     "Failed to refresh the CPU usage, because the mutex is poisoned: {}",
-                    e
+                    error
                 );
             }
 
@@ -77,13 +77,10 @@ impl Collector for CpuUsageCollector {
                 system.refresh_cpu_usage();
                 let cpus = system.cpus();
 
-                let global_usage = system.global_cpu_usage() as f64 / cpus.len() as f64;
-                total_usage.set(global_usage);
-
-                for (idx, cpu) in cpus.iter().enumerate() {
-                    let label = format!("{}", idx);
+                total_usage.set(system.global_cpu_usage() as f64);
+                for cpu in cpus.iter() {
                     core_usage
-                        .with_label_values(&[&label])
+                        .with_label_values(&[cpu.name()])
                         .set(cpu.cpu_usage() as f64);
                 }
             }
