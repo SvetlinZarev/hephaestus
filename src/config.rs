@@ -1,4 +1,4 @@
-use crate::collector::cpu_usage;
+use crate::collector::{cpu_frequency, cpu_usage};
 use config::Config;
 use serde::Deserialize;
 use std::time::Duration;
@@ -43,7 +43,8 @@ impl Default for Http {
 
 #[derive(Debug, Clone, Deserialize, Default)]
 pub struct Collectors {
-    pub cpu_usage_collector: cpu_usage::Config,
+    pub cpu_usage: cpu_usage::Config,
+    pub cpu_frequency: cpu_frequency::Config,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]

@@ -1,6 +1,7 @@
 use prometheus::Registry;
 
 pub mod cpu_usage;
+pub mod cpu_frequency;
 
 #[async_trait::async_trait]
 pub trait Metric: Send + Sync {
