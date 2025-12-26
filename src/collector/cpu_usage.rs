@@ -15,14 +15,14 @@ impl Default for Config {
     }
 }
 
-pub struct CpuUsageCollector {
+pub struct CpuUsage {
     config: Config,
     system: Arc<Mutex<System>>,
     core_usage: GaugeVec,
     total_usage: Gauge,
 }
 
-impl CpuUsageCollector {
+impl CpuUsage {
     pub fn new(config: Config, system: Arc<Mutex<System>>) -> anyhow::Result<Self> {
         let opts = Opts::new("system_cpu_core_usage", "CPU usage percentage per core");
         let core_usage = GaugeVec::new(opts, &["core"])?;
@@ -38,7 +38,7 @@ impl CpuUsageCollector {
 }
 
 #[async_trait::async_trait]
-impl Metric for CpuUsageCollector {
+impl Metric for CpuUsage {
     fn name(&self) -> &'static str {
         "cpu-usage"
     }
@@ -59,7 +59,7 @@ impl Metric for CpuUsageCollector {
 }
 
 #[async_trait::async_trait]
-impl Collector for CpuUsageCollector {
+impl Collector for CpuUsage {
     async fn collect(&self) -> anyhow::Result<()> {
         let system = self.system.clone();
         let total_usage = self.total_usage.clone();

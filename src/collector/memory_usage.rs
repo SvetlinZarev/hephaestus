@@ -19,7 +19,7 @@ impl Default for Config {
     }
 }
 
-pub struct MemoryUsageCollector {
+pub struct MemoryUsage {
     config: Config,
     system: Arc<Mutex<System>>,
     metrics: Metrics,
@@ -37,7 +37,7 @@ struct Metrics {
     mem_total: IntGauge,
 }
 
-impl MemoryUsageCollector {
+impl MemoryUsage {
     pub fn new(config: Config, system: Arc<Mutex<System>>) -> anyhow::Result<Self> {
         let metrics = Metrics {
             swap_free: IntGauge::new("system_swap_free_bytes", "Amount of free swap memory")?,
@@ -64,7 +64,7 @@ impl MemoryUsageCollector {
 }
 
 #[async_trait::async_trait]
-impl Metric for MemoryUsageCollector {
+impl Metric for MemoryUsage {
     fn name(&self) -> &'static str {
         "memory-usage"
     }
@@ -94,7 +94,7 @@ impl Metric for MemoryUsageCollector {
 }
 
 #[async_trait::async_trait]
-impl Collector for MemoryUsageCollector {
+impl Collector for MemoryUsage {
     async fn collect(&self) -> anyhow::Result<()> {
         let system = self.system.clone();
         let metrics = self.metrics.clone();

@@ -15,13 +15,13 @@ impl Default for Config {
     }
 }
 
-pub struct CpuFrequencyCollector {
+pub struct CpuFrequency {
     config: Config,
     system: Arc<Mutex<System>>,
     core_freq: IntGaugeVec,
 }
 
-impl CpuFrequencyCollector {
+impl CpuFrequency {
     pub fn new(config: Config, system: Arc<Mutex<System>>) -> anyhow::Result<Self> {
         let opts = Opts::new("system_cpu_core_frequency", "CPU core frequency");
         let core_freq = IntGaugeVec::new(opts, &["core"])?;
@@ -35,7 +35,7 @@ impl CpuFrequencyCollector {
 }
 
 #[async_trait::async_trait]
-impl Metric for CpuFrequencyCollector {
+impl Metric for CpuFrequency {
     fn name(&self) -> &'static str {
         "cpu-frequency"
     }
@@ -55,7 +55,7 @@ impl Metric for CpuFrequencyCollector {
 }
 
 #[async_trait::async_trait]
-impl Collector for CpuFrequencyCollector {
+impl Collector for CpuFrequency {
     async fn collect(&self) -> anyhow::Result<()> {
         let system = self.system.clone();
         let core_freq = self.core_freq.clone();
