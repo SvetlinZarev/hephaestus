@@ -11,6 +11,7 @@ codegen-units = 1
 
 # Core
 tokio = { version = "1", features = ["fs", "io-std", "io-util", "net", "rt", "signal", "sync", "macros"] }
+futures = "0.3.31"
 
 # Util
 async-trait = "0.1"
