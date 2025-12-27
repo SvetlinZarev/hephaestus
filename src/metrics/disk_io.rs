@@ -19,11 +19,13 @@ pub struct DeviceIoStats {
     pub device_name: String,
     pub bytes_read: u64,
     pub bytes_written: u64,
+    pub read_ops: u64,
+    pub write_ops: u64,
 }
 
 #[derive(Debug, Clone)]
 pub struct DiskIoStats {
-    pub devices: Vec<DeviceIoStats>,
+    pub disks: Vec<DeviceIoStats>,
 }
 
 pub trait DataSource {
@@ -31,30 +33,53 @@ pub trait DataSource {
 }
 
 #[derive(Clone)]
-struct Metrics {
-    bytes_read: IntGaugeVec,
-    bytes_written: IntGaugeVec,
+pub struct Metrics {
+    pub bytes_read: IntGaugeVec,
+    pub bytes_written: IntGaugeVec,
+    pub ops_read: IntGaugeVec,
+    pub ops_write: IntGaugeVec,
 }
 
 impl Metrics {
-    fn register(registry: &Registry) -> anyhow::Result<Self> {
-        let read_opts = Opts::new(
-            "system_disk_bytes_read_total",
-            "Total bytes read from disk (cumulative)",
-        );
-        let bytes_read = IntGaugeVec::new(read_opts, &["device"])?;
+    pub fn register(registry: &Registry) -> anyhow::Result<Self> {
+        let bytes_read = IntGaugeVec::new(
+            Opts::new("system_disk_bytes_read_total", "Total bytes read from disk"),
+            &["device"],
+        )?;
         registry.register(Box::new(bytes_read.clone()))?;
 
-        let write_opts = Opts::new(
-            "system_disk_bytes_written_total",
-            "Total bytes written to disk (cumulative)",
-        );
-        let bytes_written = IntGaugeVec::new(write_opts, &["device"])?;
+        let bytes_written = IntGaugeVec::new(
+            Opts::new(
+                "system_disk_bytes_written_total",
+                "Total bytes written to disk",
+            ),
+            &["device"],
+        )?;
         registry.register(Box::new(bytes_written.clone()))?;
+
+        let ops_read = IntGaugeVec::new(
+            Opts::new(
+                "system_disk_read_ops_total",
+                "Total read operations completed",
+            ),
+            &["device"],
+        )?;
+        registry.register(Box::new(ops_read.clone()))?;
+
+        let ops_write = IntGaugeVec::new(
+            Opts::new(
+                "system_disk_write_ops_total",
+                "Total write operations completed",
+            ),
+            &["device"],
+        )?;
+        registry.register(Box::new(ops_write.clone()))?;
 
         Ok(Self {
             bytes_read,
             bytes_written,
+            ops_read,
+            ops_write,
         })
     }
 }
@@ -109,7 +134,7 @@ where
     async fn collect(&self) -> anyhow::Result<()> {
         let stats = self.data_source.disk_io().await?;
 
-        for dev in stats.devices {
+        for dev in stats.disks {
             if self.should_collect(&dev.device_name) {
                 let label = &[dev.device_name.as_str()];
 
@@ -122,6 +147,16 @@ where
                     .bytes_written
                     .with_label_values(label)
                     .set(dev.bytes_written as i64);
+
+                self.metrics
+                    .ops_read
+                    .with_label_values(label)
+                    .set(dev.read_ops as i64);
+
+                self.metrics
+                    .ops_write
+                    .with_label_values(label)
+                    .set(dev.write_ops as i64);
             }
         }
 

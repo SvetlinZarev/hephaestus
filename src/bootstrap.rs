@@ -22,5 +22,9 @@ pub fn init_collectors(
     let data_source = datasource::network_io::NetworkIo::new(TokioReader::new());
     collectors.push(net_io.register(registry, data_source)?);
 
+    let disk_io = metrics::disk_io::DiskIo::new(config.disk_io.clone());
+    let data_source = datasource::disk_io::DiskIo::new(TokioReader::new());
+    collectors.push(disk_io.register(registry, data_source)?);
+
     Ok(collectors)
 }
