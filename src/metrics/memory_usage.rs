@@ -18,14 +18,14 @@ impl Default for Config {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct SwapStats {
     pub total: u64,
     pub used: u64,
     pub free: u64,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct RamStats {
     pub total: u64,
     pub used: u64,
