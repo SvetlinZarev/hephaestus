@@ -52,14 +52,14 @@ impl Metrics {
         let labels = vec!["device".to_owned()];
 
         let bytes_read = Desc::new(
-            "system_disk_bytes_read_total".into(),
+            "system_disk_read_bytes_total".into(),
             "Total bytes read".into(),
             labels.clone(),
             HashMap::new(),
         )?;
 
         let bytes_written = Desc::new(
-            "system_disk_bytes_written_total".into(),
+            "system_disk_written_bytes_total".into(),
             "Total bytes written".into(),
             labels.clone(),
             HashMap::new(),
