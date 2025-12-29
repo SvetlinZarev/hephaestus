@@ -1,5 +1,6 @@
 use crate::datasource::Reader;
 use crate::metrics::disk_io::{DataSource, DeviceIoStats, DiskIoStats};
+use tokio::time::Instant;
 
 const PATH_DISK_STATS: &str = "/proc/diskstats";
 const KERNEL_SECTOR_SIZE: u64 = 512;
@@ -24,8 +25,9 @@ where
     fn disk_io(&self) -> impl Future<Output = anyhow::Result<DiskIoStats>> + Send {
         async move {
             let content = self.reader.read_to_string(PATH_DISK_STATS).await?;
-            let mut disks = Vec::new();
+            let timestamp = Instant::now();
 
+            let mut disks = Vec::new();
             for line in content.lines() {
                 let mut parts = line.split_whitespace();
 
@@ -85,7 +87,7 @@ where
                 });
             }
 
-            Ok(DiskIoStats { disks })
+            Ok(DiskIoStats { timestamp, disks })
         }
     }
 }

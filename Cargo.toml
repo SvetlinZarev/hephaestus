@@ -35,5 +35,4 @@ tower = "0.5"
 tower-http = { version = "0.6", features = ["timeout", "limit", "trace", "catch-panic", "normalize-path", "request-id"] }
 
 # Metrics
-prometheus = { version = "0.14.0", default-features = false, features = ["process"] }
-sysinfo = "0.37"
+prometheus = "0.14.0"
