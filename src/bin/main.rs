@@ -13,7 +13,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     tracing::info!("Starting Hephaestus");
 
     let registry = prometheus::Registry::new();
-    let collectors = Arc::new(init_collectors(&configuration.collectors, &registry)?);
+    let collectors = Arc::new(init_collectors(&configuration, &registry)?);
 
     let state = AppState {
         configuration,

@@ -182,7 +182,7 @@ struct DiskIoCollector<T> {
     data_source: T,
 }
 
-impl<T> DiskIoCollector<T> {
+impl<T> DiskIoCollector<T> where T: DataSource {
     fn new(data_source: T) -> Self {
         Self {
             measurement: Arc::new(Mutex::new(None)),
