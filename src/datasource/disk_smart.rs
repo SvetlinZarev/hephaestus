@@ -99,13 +99,25 @@ impl SmartCtl {
 
     fn parse_sata(&self, info: Device, json: &Value) -> SataDevice {
         let mut device = SataDevice::new(info);
-        device.temperature = self.extract_sata_temp(json);
 
         if let Some(table) = json["ata_smart_attributes"]["table"].as_array() {
             for attr in table {
                 if let Some(id) = attr["id"].as_u64() {
                     let raw_val = attr["raw"]["value"].as_u64().unwrap_or(0);
                     match id {
+                        // Temperature Attributes (194: Temperature_Celsius, 190: Airflow_Temperature)
+                        194 | 190 => {
+                            // Bits 0-7: Current Temperature
+                            device.temperature = Some((raw_val & 0xFF) as f64);
+
+                            // Seagate/WD often pack Min/Max in higher bytes
+                            // Byte 2 (bits 16-23) is Min, Byte 4 (bits 32-39) is Max
+                            if raw_val > 0xFFFF {
+                                device.temperature_min = Some(((raw_val >> 16) & 0xFF) as f64);
+                                device.temperature_max = Some(((raw_val >> 32) & 0xFF) as f64);
+                            }
+                        }
+
                         4 => device.start_stop_count = Some(raw_val),
                         5 => device.reallocated_sectors = Some(raw_val),
                         9 => device.power_on_hours = Some(raw_val),
@@ -115,8 +127,13 @@ impl SmartCtl {
                         198 => device.uncorrectable_errors = Some(raw_val),
                         199 => device.crc_errors = Some(raw_val),
 
-                        // Common IDs for SSD wear: 233 (Media Wearout) or 177 (Wear Range Delta)
-                        233 | 177 => device.wear_level = Some(raw_val as f64 / 100.0),
+                        // SSD Wear Level (Life Remaining %)
+                        // 231: SSD Life Left (Samsung/Kingston)
+                        // 233: Media Wearout Indicator (Intel/Crucial)
+                        // 202: Percentage Lifetime Used
+                        231 | 233 | 202 => {
+                            device.wear_level = Some(raw_val as f64);
+                        }
                         _ => {}
                     }
                 }
@@ -124,19 +141,6 @@ impl SmartCtl {
         }
 
         device
-    }
-
-    fn extract_sata_temp(&self, json: &Value) -> Option<f64> {
-        if let Some(table) = json["ata_smart_attributes"]["table"].as_array() {
-            for attr in table {
-                let id = attr["id"].as_u64().unwrap_or(0);
-                if id == 194 || id == 190 {
-                    return attr["raw"]["value"].as_f64();
-                }
-            }
-        }
-
-        None
     }
 }
 

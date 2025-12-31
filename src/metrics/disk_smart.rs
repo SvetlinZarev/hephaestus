@@ -30,6 +30,8 @@ pub struct SmartReports {
 pub struct SataDevice {
     pub device: Device,
     pub temperature: Option<f64>,
+    pub temperature_min: Option<f64>, // Added
+    pub temperature_max: Option<f64>, // Added
     pub start_stop_count: Option<u64>,
     pub power_on_hours: Option<u64>,
     pub power_cycle_count: Option<u64>,
@@ -38,8 +40,6 @@ pub struct SataDevice {
     pub pending_sectors: Option<u64>,
     pub uncorrectable_errors: Option<u64>,
     pub crc_errors: Option<u64>,
-
-    // Wear level, only for SATA SSDs
     pub wear_level: Option<f64>,
 }
 
@@ -48,6 +48,8 @@ impl SataDevice {
         Self {
             device,
             temperature: None,
+            temperature_min: None,
+            temperature_max: None,
             start_stop_count: None,
             power_on_hours: None,
             power_cycle_count: None,
@@ -110,6 +112,8 @@ pub struct Metrics {
     state: Arc<Mutex<Option<SmartReports>>>,
 
     sata_temp: Desc,
+    sata_temp_min: Desc,
+    sata_temp_max: Desc,
     sata_start_stop: Desc,
     sata_power_on: Desc,
     sata_power_cycle: Desc,
@@ -143,6 +147,18 @@ impl Metrics {
             sata_temp: Desc::new(
                 "system_smart_sata_temperature_celsius".into(),
                 "Current SATA disk temperature".into(),
+                labels.clone(),
+                HashMap::new(),
+            )?,
+            sata_temp_min: Desc::new(
+                "smart_sata_temperature_min_celsius".into(),
+                "Minimum temperature recorded by the SATA device".into(),
+                labels.clone(),
+                HashMap::new(),
+            )?,
+            sata_temp_max: Desc::new(
+                "smart_sata_temperature_max_celsius".into(),
+                "Maximum temperature recorded by the SATA device".into(),
                 labels.clone(),
                 HashMap::new(),
             )?,
@@ -349,6 +365,8 @@ impl prometheus::core::Collector for Metrics {
     fn desc(&self) -> Vec<&Desc> {
         vec![
             &self.sata_temp,
+            &self.sata_temp_min,
+            &self.sata_temp_max,
             &self.sata_start_stop,
             &self.sata_power_on,
             &self.sata_power_cycle,
@@ -401,6 +419,8 @@ impl prometheus::core::Collector for Metrics {
             let f = &mut families;
 
             self.maybe_gauge(f, &self.sata_temp, &l, s.temperature);
+            self.maybe_gauge(f, &self.sata_temp_min, &l, s.temperature_min);
+            self.maybe_gauge(f, &self.sata_temp_max, &l, s.temperature_max);
             self.maybe_counter(f, &self.sata_start_stop, &l, s.start_stop_count);
             self.maybe_counter(f, &self.sata_power_on, &l, s.power_on_hours);
             self.maybe_counter(f, &self.sata_power_cycle, &l, s.power_cycle_count);
