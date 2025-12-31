@@ -21,6 +21,7 @@ impl<R> DataSource for NetworkIo<R>
 where
     R: Reader,
 {
+    #[allow(clippy::manual_async_fn)]
     fn network_io(&self) -> impl Future<Output = anyhow::Result<NetworkIoStats>> + Send {
         async move {
             let content = self.reader.read_to_string(PATH_NET_DEV).await?;

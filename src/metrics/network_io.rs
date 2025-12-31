@@ -113,7 +113,7 @@ impl Metrics {
             let mut lp = LabelPair::default();
             lp.set_name("device".into());
             lp.set_value(iface.interface.clone());
-            m.set_label(vec![lp].into());
+            m.set_label(vec![lp]);
 
             let mut c = prometheus::proto::Counter::default();
             c.set_value(extract(iface) as f64);
@@ -121,7 +121,7 @@ impl Metrics {
 
             metrics.push(m);
         }
-        mf.set_metric(metrics.into());
+        mf.set_metric(metrics);
         mf
     }
 }

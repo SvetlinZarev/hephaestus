@@ -1,12 +1,13 @@
 use crate::domain::Collector;
 
+#[derive(Default)]
 pub struct NoOpCollector {
     //
 }
 
 impl NoOpCollector {
     pub fn new() -> Self {
-        Self {}
+        Self::default()
     }
 }
 

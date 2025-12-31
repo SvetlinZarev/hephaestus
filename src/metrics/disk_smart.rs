@@ -270,37 +270,37 @@ impl Metrics {
         Ok(())
     }
 
-    fn gauge(&self, desc: &Desc, label_values: &Vec<LabelPair>, value: f64) -> MetricFamily {
+    fn gauge(&self, desc: &Desc, label_values: &[LabelPair], value: f64) -> MetricFamily {
         let mut mf = MetricFamily::default();
         mf.set_name(desc.fq_name.clone());
         mf.set_help(desc.help.clone());
         mf.set_field_type(MetricType::GAUGE);
 
         let mut m = prometheus::proto::Metric::default();
-        m.set_label(label_values.clone().into());
+        m.set_label(label_values.to_vec());
 
         let mut g = prometheus::proto::Gauge::default();
         g.set_value(value);
         m.set_gauge(g);
 
-        mf.set_metric(vec![m].into());
+        mf.set_metric(vec![m]);
         mf
     }
 
-    fn counter(&self, desc: &Desc, label_values: &Vec<LabelPair>, value: f64) -> MetricFamily {
+    fn counter(&self, desc: &Desc, label_values: &[LabelPair], value: f64) -> MetricFamily {
         let mut mf = MetricFamily::default();
         mf.set_name(desc.fq_name.clone());
         mf.set_help(desc.help.clone());
         mf.set_field_type(MetricType::COUNTER);
 
         let mut m = prometheus::proto::Metric::default();
-        m.set_label(label_values.clone().into());
+        m.set_label(label_values.to_vec());
 
         let mut c = prometheus::proto::Counter::default();
         c.set_value(value);
         m.set_counter(c);
 
-        mf.set_metric(vec![m].into());
+        mf.set_metric(vec![m]);
         mf
     }
 
@@ -308,7 +308,7 @@ impl Metrics {
         &self,
         families: &mut Vec<MetricFamily>,
         desc: &Desc,
-        labels: &Vec<LabelPair>,
+        labels: &[LabelPair],
         val: Option<f64>,
     ) {
         if let Some(v) = val {
@@ -320,7 +320,7 @@ impl Metrics {
         &self,
         families: &mut Vec<MetricFamily>,
         desc: &Desc,
-        labels: &Vec<LabelPair>,
+        labels: &[LabelPair],
         val: Option<u64>,
     ) {
         if let Some(v) = val {

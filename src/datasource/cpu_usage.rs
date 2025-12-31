@@ -3,7 +3,7 @@ use crate::metrics::cpu_usage::{CoreStats, CoreUsageStats, CpuUsageStats, DataSo
 use std::sync::Mutex;
 use tokio::time::{Duration, Instant};
 
-const PATH_PROC_STAT: &'static str = "/proc/stat";
+const PATH_PROC_STAT: &str = "/proc/stat";
 const MIN_TIME_BETWEEN_MEASUREMENTS: Duration = Duration::from_millis(250);
 
 const CPU_USER: usize = 0;
@@ -44,6 +44,7 @@ impl<R> DataSource for CpuUsage<R>
 where
     R: Reader,
 {
+    #[allow(clippy::manual_async_fn)]
     fn cpu_usage(&self) -> impl Future<Output = anyhow::Result<CpuUsageStats>> + Send {
         async move {
             let Ok(mut previous) = self.measurement.lock().map(|x| x.clone()) else {
@@ -119,15 +120,13 @@ fn parse_proc_stat(content: &str) -> Vec<[u64; 10]> {
     content
         .lines()
         .filter(|l| l.starts_with("cpu"))
-        .filter_map(|line| {
-            let mut parts = line.split_whitespace().skip(1);
+        .map(|line| {
             let mut vals = [0u64; 10];
-            for i in 0..10 {
-                if let Some(p) = parts.next() {
-                    vals[i] = p.parse::<u64>().unwrap_or(0);
-                }
+            for (idx, part) in line.split_whitespace().skip(1).take(10).enumerate() {
+                vals[idx] = part.parse::<u64>().unwrap_or(0);
             }
-            Some(vals)
+
+            vals
         })
         .collect()
 }

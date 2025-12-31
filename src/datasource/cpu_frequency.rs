@@ -18,6 +18,7 @@ impl<R> DataSource for CpuFrequency<R>
 where
     R: Reader,
 {
+    #[allow(clippy::manual_async_fn)]
     fn cpy_freq(&self) -> impl Future<Output = anyhow::Result<CpuFreqStats>> + Send {
         async move {
             let mut core_freq = Vec::new();

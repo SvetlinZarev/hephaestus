@@ -51,6 +51,7 @@ impl<R> DataSource for MemoryUsage<R>
 where
     R: Reader,
 {
+    #[allow(clippy::manual_async_fn)]
     fn swap(&self) -> impl Future<Output = anyhow::Result<SwapStats>> + Send {
         async move {
             let mut total = 0;
@@ -74,6 +75,7 @@ where
         }
     }
 
+    #[allow(clippy::manual_async_fn)]
     fn ram(&self) -> impl Future<Output = anyhow::Result<RamStats>> + Send {
         async move {
             let mut total = 0;

@@ -155,7 +155,7 @@ impl Metrics {
                 let mut lp = LabelPair::default();
                 lp.set_name("ups".into());
                 lp.set_value(ups.device_name.clone());
-                m.set_label(vec![lp].into());
+                m.set_label(vec![lp]);
 
                 let mut g = prometheus::proto::Gauge::default();
                 g.set_value(val);
@@ -163,7 +163,7 @@ impl Metrics {
                 metrics.push(m);
             }
         }
-        mf.set_metric(metrics.into());
+        mf.set_metric(metrics);
         mf
     }
 }

@@ -24,6 +24,7 @@ impl TokioReader {
 }
 
 impl Reader for TokioReader {
+    #[allow(clippy::manual_async_fn)]
     fn read_to_string(
         &self,
         path: impl AsRef<Path> + Send,

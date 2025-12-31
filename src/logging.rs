@@ -69,6 +69,7 @@ where
     )
 }
 
+#[allow(clippy::type_complexity)]
 fn construct_log_file_layer<S>(
     cfg: &Log,
 ) -> Result<
@@ -98,10 +99,7 @@ where
                 .map_err(|e| {
                     format!(
                         "Failed to create file appender for directory [{}]. Error=[{}]",
-                        cfg.log_file_directory
-                            .as_ref()
-                            .map(|s| s.as_str())
-                            .unwrap_or(""),
+                        cfg.log_file_directory.as_deref().unwrap_or(""),
                         e
                     )
                 })?;

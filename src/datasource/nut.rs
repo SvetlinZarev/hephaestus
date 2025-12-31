@@ -52,10 +52,8 @@ impl Nut {
 
             // Format: UPS <name> "Description"
             let parts: Vec<&str> = trimmed.split_whitespace().collect();
-            if parts.get(0) == Some(&"UPS") {
-                if let Some(&name) = parts.get(1) {
-                    names.push(name.to_owned());
-                }
+            if parts.len() >= 2 && parts[0] == "UPS" {
+                names.push(parts[1].to_owned());
             }
 
             line.clear();
@@ -124,7 +122,7 @@ impl Nut {
         let nominal_apparent_power = find(&["ups.power.nominal", "output.power.nominal"]);
         let nominal_real_power = find(&["ups.realpower.nominal", "output.realpower.nominal"]);
 
-        let real_power = find(&["ups.realpower", "output.realpower"]).or_else(|| {
+        let real_power = find(&["ups.realpower", "output.realpower"]).or({
             match (nominal_real_power, load) {
                 (Some(nom_w), Some(load)) if nom_w > 0.0 => Some(nom_w * load),
                 _ => None,
@@ -132,7 +130,7 @@ impl Nut {
         });
 
         let apparent_power =
-            find(&["ups.power", "output.power"]).or_else(|| match (nominal_apparent_power, load) {
+            find(&["ups.power", "output.power"]).or(match (nominal_apparent_power, load) {
                 (Some(nom_va), Some(load)) if nom_va > 0.0 => Some(nom_va * load),
                 _ => None,
             });

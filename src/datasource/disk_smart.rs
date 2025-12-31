@@ -141,6 +141,7 @@ impl SmartCtl {
 }
 
 impl DataSource for SmartCtl {
+    #[allow(clippy::manual_async_fn)]
     fn disk_temps(&self) -> impl Future<Output = anyhow::Result<SmartReports>> + Send {
         async move {
             let device_paths = self.scan_devices().await?;
