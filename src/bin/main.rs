@@ -9,6 +9,10 @@ use std::sync::Arc;
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let configuration = Arc::new(Configuration::load(get_config_base_path())?);
     let _guard = setup_logging(&configuration.log)?;
+    if should_print_config_and_exit() {
+        print_config(&configuration)?;
+        return Ok(());
+    }
 
     tracing::info!("Starting Hephaestus");
 
@@ -36,4 +40,15 @@ fn get_config_base_path() -> String {
     }
 
     base_path.to_owned()
+}
+
+fn should_print_config_and_exit() -> bool {
+    std::env::args()
+        .inspect(|arg| tracing::debug!(argument=%arg))
+        .any(|arg| arg == "--print-config")
+}
+
+fn print_config(config: &Configuration) -> anyhow::Result<()> {
+    println!("{}", toml::to_string(config)?);
+    Ok(())
 }

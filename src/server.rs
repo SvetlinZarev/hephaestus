@@ -28,7 +28,7 @@ pub async fn start_server(state: AppState) -> Result<(), Box<dyn Error + Send + 
     let router = create_router(state);
 
     let mut handles = Vec::new();
-    for addr in (config.http.addr.as_str(), config.http.port).to_socket_addrs()? {
+    for addr in (config.http.address.as_str(), config.http.port).to_socket_addrs()? {
         let listener = TcpListener::bind(addr)
             .await
             .map_err(|e| format!("Could not bind to {}: {}", addr, e))?;
@@ -48,7 +48,7 @@ pub async fn start_server(state: AppState) -> Result<(), Box<dyn Error + Send + 
     if handles.is_empty() {
         return Err(format!(
             "The bind address [{}:{}] did not resolve to any IP addresses",
-            config.http.addr, config.http.port
+            config.http.address, config.http.port
         )
         .into());
     }

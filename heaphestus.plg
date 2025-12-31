@@ -1,0 +1,77 @@
+<?xml version='1.0' standalone='yes'?>
+<!DOCTYPE PLUGIN [
+  <!ENTITY name      "hephaestus">
+  <!ENTITY author    "SvetlinZarev">
+  <!ENTITY version   "2025.12.31">
+  <!ENTITY pluginURL "https://raw.githubusercontent.com/&author;/Hephaestus/master/&name;.plg">
+  <!ENTITY binaryURL "https://github.com/&author;/Hephaestus/releases/latest/download/hephaestus_linux_amd64">
+  <!ENTITY pluginDir "/boot/config/plugins/&name;">
+  <!ENTITY logDir    "/var/log/&name;">
+]>
+
+<PLUGIN name="&name;" author="&author;" version="&version;" pluginURL="&pluginURL;" min="7.0.0">
+
+<CHANGES>
+###2025.12.31
+- Initial release
+</CHANGES>
+
+<FILE Run="/bin/bash">
+<INLINE>
+  killall &name; || true
+  mkdir -p &pluginDir;
+</INLINE>
+</FILE>
+
+<FILE Name="&pluginDir;/&name;" Run="/bin/bash">
+<URL>&binaryURL;</URL>
+</FILE>
+
+<FILE Run="/bin/bash">
+<INLINE>
+  # Move binary to system path
+  cp &pluginDir;/&name; /usr/local/sbin/&name;
+  chmod 0755 /usr/local/sbin/&name;
+
+  # Check if config already exists; if not, generate it
+  if [ ! -f "&pluginDir;/config.toml" ]; then
+    echo "Generating default configuration..."
+    /usr/local/sbin/&name; --print-config > "&pluginDir;/config.toml.tmp"
+
+    # Check if the previous command succeeded (Status 0)
+    if [ $? -eq 0 ]; then
+      mv "&pluginDir;/config.toml.tmp" "&pluginDir;/config.toml"
+      echo "Configuration saved to &pluginDir;/config.toml"
+    else
+      rm -f "&pluginDir;/config.toml.tmp"
+      echo "Error: Failed to generate default configuration. Creating empty file instead."
+      touch "&pluginDir;/config.toml"
+    fi
+  else
+    echo "Existing configuration found, skipping generation."
+  fi
+</INLINE>
+</FILE>
+
+<FILE Run="/bin/bash">
+<INLINE>
+  echo "Starting &name;..."
+  mkdir -p &logDir;
+
+  # Start the service
+  nohup /usr/local/sbin/&name; &pluginDir;/config.toml 1>&logDir;/stdout.log 2>&logDir;/stderr.log &amp;
+
+  echo "Installation successful."
+</INLINE>
+</FILE>
+
+<FILE Run="/bin/bash" Method="remove">
+<INLINE>
+  killall &name;
+  rm -f /usr/local/sbin/&name;
+  rm -rf &logDir;
+  echo "&name; removed. Configuration in &pluginDir; was preserved."
+</INLINE>
+</FILE>
+
+</PLUGIN>

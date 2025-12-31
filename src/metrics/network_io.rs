@@ -19,7 +19,7 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             enabled: true,
-            watch_interfaces: None,
+            watch_interfaces: Some(vec!["bond0".to_owned(), "tailscale1".to_owned()]),
             ignore_interfaces: None,
         }
     }
@@ -92,7 +92,12 @@ impl Metrics {
         Ok(())
     }
 
-    fn build_metric_family<F>(&self, desc: &Desc, stats: &NetworkIoStats, extract: F) -> MetricFamily
+    fn build_metric_family<F>(
+        &self,
+        desc: &Desc,
+        stats: &NetworkIoStats,
+        extract: F,
+    ) -> MetricFamily
     where
         F: Fn(&InterfaceStats) -> u64,
     {

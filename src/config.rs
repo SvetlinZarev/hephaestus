@@ -69,7 +69,7 @@ impl Default for Log {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Http {
     pub port: u16,
-    pub addr: String,
+    pub address: String,
     pub timeout: u64,
 }
 
@@ -77,7 +77,7 @@ impl Default for Http {
     fn default() -> Self {
         Self {
             port: 9123,
-            addr: "127.0.0.1".to_owned(),
+            address: "127.0.0.1".to_owned(),
             timeout: Duration::from_secs(10).as_millis() as u64,
         }
     }
