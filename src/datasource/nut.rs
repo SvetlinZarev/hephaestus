@@ -16,7 +16,7 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            address: "localhost".to_owned(),
+            address: "127.0.0.1".to_owned(),
             port: 3493,
         }
     }
@@ -103,24 +103,51 @@ impl Nut {
 
     fn collect_device_parameters(
         &self,
-        name: String,
+        device_name: String,
         params: HashMap<String, String>,
     ) -> UpsDeviceStats {
-        let parse = |key: &str| params.get(key).and_then(|v| v.parse::<f64>().ok());
+        let as_percents = |x: f64| -> f64 { x / 100.0 };
+        let find = |keys: &[&str]| {
+            keys.iter()
+                .find_map(|&key| params.get(key).and_then(|v| v.parse::<f64>().ok()))
+        };
+
+        let estimated_runtime = find(&["battery.runtime", "battery.runtime.low"]);
+
+        let battery_level =
+            find(&["battery.charge", "battery.level", "battery.charge.approx"]).map(as_percents);
+
+        let load = find(&["ups.load", "output.load"]).map(as_percents);
+        let input_voltage = find(&["input.voltage"]);
+        let output_voltage = find(&["output.voltage"]);
+
+        let nominal_apparent_power = find(&["ups.power.nominal", "output.power.nominal"]);
+        let nominal_real_power = find(&["ups.realpower.nominal", "output.realpower.nominal"]);
+
+        let real_power = find(&["ups.realpower", "output.realpower"]).or_else(|| {
+            match (nominal_real_power, load) {
+                (Some(nom_w), Some(load)) if nom_w > 0.0 => Some(nom_w * load),
+                _ => None,
+            }
+        });
+
+        let apparent_power =
+            find(&["ups.power", "output.power"]).or_else(|| match (nominal_apparent_power, load) {
+                (Some(nom_va), Some(load)) if nom_va > 0.0 => Some(nom_va * load),
+                _ => None,
+            });
 
         UpsDeviceStats {
-            device_name: name,
-            estimated_runtime: parse("battery.runtime").unwrap_or(0.0),
-            battery_level: parse("battery.charge").unwrap_or(0.0) / 100.0,
-            input_voltage: parse("input.voltage"),
-            output_voltage: parse("output.voltage"),
-            load: parse("ups.load").unwrap_or(0.0) / 100.0,
-            real_power: parse("ups.realpower").unwrap_or(0.0),
-
-            // Fallback logic: some UPS use ups.realpower, others ups.power
-            apparent_power: parse("ups.power")
-                .or_else(|| parse("ups.realpower"))
-                .unwrap_or(0.0),
+            device_name,
+            estimated_runtime,
+            battery_level,
+            input_voltage,
+            output_voltage,
+            load,
+            real_power,
+            apparent_power,
+            nominal_apparent_power,
+            nominal_real_power,
         }
     }
 }

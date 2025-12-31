@@ -28,13 +28,19 @@ pub struct UpsStats {
 #[derive(Debug, Clone)]
 pub struct UpsDeviceStats {
     pub device_name: String,
-    pub estimated_runtime: f64,
-    pub battery_level: f64,
+
+    pub estimated_runtime: Option<f64>,
+    pub battery_level: Option<f64>,
+    pub load: Option<f64>,
+
     pub input_voltage: Option<f64>,
     pub output_voltage: Option<f64>,
-    pub apparent_power: f64,
-    pub real_power: f64,
-    pub load: f64,
+
+    pub nominal_apparent_power: Option<f64>,
+    pub nominal_real_power: Option<f64>,
+
+    pub apparent_power: Option<f64>,
+    pub real_power: Option<f64>,
 }
 
 pub trait DataSource {
@@ -48,6 +54,8 @@ pub struct Metrics {
     battery_level: Desc,
     input_voltage: Desc,
     output_voltage: Desc,
+    nominal_apparent_power: Desc,
+    nominal_real_power: Desc,
     apparent_power: Desc,
     real_power: Desc,
     load: Desc,
@@ -81,6 +89,18 @@ impl Metrics {
             labels.clone(),
             HashMap::new(),
         )?;
+        let nominal_apparent_power = Desc::new(
+            "system_ups_nominal_apparent_power_va".into(),
+            "Nominal apparent power".into(),
+            labels.clone(),
+            HashMap::new(),
+        )?;
+        let nominal_real_power = Desc::new(
+            "system_ups_nominal_real_power_watts".into(),
+            "Nominal real power".into(),
+            labels.clone(),
+            HashMap::new(),
+        )?;
         let apparent_power = Desc::new(
             "system_ups_apparent_power_va".into(),
             "Apparent power draw".into(),
@@ -106,6 +126,8 @@ impl Metrics {
             battery_level,
             input_voltage,
             output_voltage,
+            nominal_apparent_power,
+            nominal_real_power,
             apparent_power,
             real_power,
             load,
@@ -167,17 +189,21 @@ impl prometheus::core::Collector for Metrics {
 
         let mut mf = Vec::new();
 
-        mf.push(self.build_metric_family(&self.runtime, stats, |u| Some(u.estimated_runtime)));
-        mf.push(self.build_metric_family(&self.battery_level, stats, |u| Some(u.battery_level)));
-        mf.push(self.build_metric_family(&self.apparent_power, stats, |u| Some(u.apparent_power)));
-        mf.push(self.build_metric_family(&self.real_power, stats, |u| Some(u.real_power)));
-        mf.push(self.build_metric_family(&self.load, stats, |u| Some(u.load)));
+        mf.push(self.build_metric_family(&self.runtime, stats, |u| u.estimated_runtime));
+        mf.push(self.build_metric_family(&self.battery_level, stats, |u| u.battery_level));
         mf.push(
-            self.build_metric_family(&self.input_voltage, stats, |u| u.input_voltage.map(|v| v)),
+            self.build_metric_family(&self.nominal_apparent_power, stats, |u| {
+                u.nominal_apparent_power
+            }),
         );
         mf.push(
-            self.build_metric_family(&self.output_voltage, stats, |u| u.output_voltage.map(|v| v)),
+            self.build_metric_family(&self.nominal_real_power, stats, |u| u.nominal_real_power),
         );
+        mf.push(self.build_metric_family(&self.apparent_power, stats, |u| u.apparent_power));
+        mf.push(self.build_metric_family(&self.real_power, stats, |u| u.real_power));
+        mf.push(self.build_metric_family(&self.load, stats, |u| u.load));
+        mf.push(self.build_metric_family(&self.input_voltage, stats, |u| u.input_voltage));
+        mf.push(self.build_metric_family(&self.output_voltage, stats, |u| u.output_voltage));
 
         mf
     }
