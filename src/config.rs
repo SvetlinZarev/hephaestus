@@ -28,6 +28,9 @@ impl Configuration {
                     .format(config::FileFormat::Toml)
                     .required(false),
             )
+            .add_source(
+                config::File::with_name(config_path.to_string_lossy().as_ref()).required(false),
+            )
             .add_source(config::Environment::with_prefix("CFG").separator("__"))
             .build()?;
 
@@ -48,12 +51,12 @@ pub struct Log {
 impl Default for Log {
     fn default() -> Self {
         Self {
-            enable_stdout: true,
+            enable_stdout: false,
             enable_log_file: true,
             log_file_directory: Some("/var/log/hephaestus/".to_owned()),
             level: "INFO".to_owned(),
             directives: vec![],
-            max_log_files: 7,
+            max_log_files: 3,
         }
     }
 }
@@ -69,7 +72,7 @@ impl Default for Http {
     fn default() -> Self {
         Self {
             port: 9123,
-            address: "127.0.0.1".to_owned(),
+            address: "0.0.0.0".to_owned(),
             timeout: Duration::from_secs(10).as_millis() as u64,
         }
     }
