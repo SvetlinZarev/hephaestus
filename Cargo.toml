@@ -10,7 +10,7 @@ codegen-units = 1
 [dependencies]
 
 # Core
-tokio = { version = "1", features = ["fs", "io-std", "io-util", "net", "rt", "signal", "sync", "macros", "test-util"] }
+tokio = { version = "1", features = ["fs", "process", "io-std", "io-util", "net", "rt", "signal", "sync", "macros", "test-util"] }
 futures = "0.3.31"
 
 # Util

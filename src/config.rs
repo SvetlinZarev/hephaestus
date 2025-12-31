@@ -1,5 +1,5 @@
 use crate::datasource::nut;
-use crate::metrics::{cpu_frequency, cpu_usage, disk_io, memory_usage, network_io, ups};
+use crate::metrics::{cpu_frequency, cpu_usage, disk_io, disk_smart, memory_usage, network_io, ups};
 use config::Config;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
@@ -90,6 +90,7 @@ pub struct Collectors {
     pub memory_usage: memory_usage::Config,
     pub network_io: network_io::Config,
     pub disk_io: disk_io::Config,
+    pub disk_temp: disk_smart::Config,
     pub ups: ups::Config,
 }
 

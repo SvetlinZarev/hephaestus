@@ -3,6 +3,7 @@ use std::path::Path;
 pub mod cpu_frequency;
 pub mod cpu_usage;
 pub mod disk_io;
+pub mod disk_smart;
 pub mod memory_usage;
 pub mod network_io;
 pub mod nut;

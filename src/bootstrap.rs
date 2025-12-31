@@ -30,6 +30,10 @@ pub fn init_collectors(
     let disk_io = metrics::disk_io::DiskIo::new(config.collector.disk_io.clone());
     let data_source = datasource::disk_io::DiskIo::new(TokioReader::new());
     collectors.push(disk_io.register(registry, data_source)?);
+    
+    let disk_temp = metrics::disk_smart::DiskTemp::new(config.collector.disk_temp.clone());
+    let datasource = datasource::disk_smart::SmartCtl::new();
+    collectors.push(disk_temp.register(registry, datasource)?);
 
     let ups = metrics::ups::Ups::new(config.collector.ups.clone());
     let data_source = datasource::nut::Nut::new(config.datasource.nut.clone());
