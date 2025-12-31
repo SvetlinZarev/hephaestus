@@ -1,0 +1,81 @@
+name: CI & Release
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  quality-check:
+    name: Test and Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Check Formatting
+        run: cargo fmt --all -- --check
+
+      - name: Lint with Clippy
+        run: cargo clippy -- -D warnings
+
+      - name: Run Tests
+        run: cargo test
+
+  build-and-release:
+    name: Build and Release
+    needs: quality-check
+    if: github.event_name == 'push' # Don't release on Pull Request events
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-musl
+
+      - name: Install musl-tools
+        run: sudo apt-get install -y musl-tools
+
+      - name: Build Binary (Static Link)
+        run: cargo build --release --target x86_64-unknown-linux-musl
+
+      - name: Prepare Binary
+        run: cp target/x86_64-unknown-linux-musl/release/hephaestus ./hephaestus_linux_amd64
+
+      - name: Create Draft Release (Main Branch)
+        if: github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v1
+        with:
+          files: hephaestus_linux_amd64
+          tag_name: "latest-build"
+          name: "Development Build (Draft)"
+          draft: true
+          # Note: This will overwrite the same draft tag each time
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create Published Release (Version Tag)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: hephaestus_linux_amd64
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

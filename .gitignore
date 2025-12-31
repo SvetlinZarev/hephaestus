@@ -7,8 +7,4 @@
 ### Exceptions
 !**/.gitignore
 !**/.cargo
-
-
-# Added by cargo
-
-/target
+!.github
