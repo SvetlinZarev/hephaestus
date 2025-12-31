@@ -18,7 +18,7 @@ async-trait = "0.1"
 anyhow = "1"
 
 # Configuration
-config = { version = "0.15" }
+config = { version = "0.15", default-features = false, features = ["toml", "json"] }
 
 # SerDe
 serde = { version = "1", features = ["derive"] }

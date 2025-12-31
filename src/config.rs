@@ -28,16 +28,6 @@ impl Configuration {
                     .format(config::FileFormat::Toml)
                     .required(false),
             )
-            .add_source(
-                config::File::with_name(config_path.join("config.yml").to_string_lossy().as_ref())
-                    .format(config::FileFormat::Yaml)
-                    .required(false),
-            )
-            .add_source(
-                config::File::with_name(config_path.join("config.json").to_string_lossy().as_ref())
-                    .format(config::FileFormat::Json)
-                    .required(false),
-            )
             .add_source(config::Environment::with_prefix("CFG").separator("__"))
             .build()?;
 
