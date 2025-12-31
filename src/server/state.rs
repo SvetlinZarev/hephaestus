@@ -4,7 +4,6 @@ use axum::extract::FromRef;
 use prometheus::Registry;
 use std::sync::Arc;
 
-
 #[derive(Clone)]
 pub struct AppState {
     pub configuration: Arc<Configuration>,

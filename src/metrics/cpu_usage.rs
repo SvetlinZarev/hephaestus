@@ -170,7 +170,7 @@ where
         // 2. Set per- stats
         for core_stat in stats.cores {
             let core_label = core_stat.core.to_string();
-            
+
             self.metrics
                 .core_usage
                 .with_label_values(&[&core_label])

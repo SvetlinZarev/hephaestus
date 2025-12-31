@@ -1,7 +1,7 @@
 use crate::server::state::AppState;
 use axum::extract::State;
-use futures::stream::FuturesUnordered;
 use futures::StreamExt;
+use futures::stream::FuturesUnordered;
 
 pub async fn health_check() -> &'static str {
     "OK"

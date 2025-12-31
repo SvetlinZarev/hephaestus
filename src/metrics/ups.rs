@@ -1,8 +1,8 @@
 use crate::domain::{Collector, Metric};
 use crate::metrics::no_operation::NoOpCollector;
+use prometheus::Registry;
 use prometheus::core::Desc;
 use prometheus::proto::{LabelPair, MetricFamily, MetricType};
-use prometheus::Registry;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};

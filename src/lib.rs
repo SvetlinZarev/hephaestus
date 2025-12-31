@@ -4,10 +4,10 @@
 #![deny(unexpected_cfgs)]
 extern crate core;
 
-pub mod domain;
 pub mod bootstrap;
 pub mod config;
+pub(crate) mod datasource;
+pub mod domain;
 pub mod logging;
 pub mod metrics;
 pub mod server;
-pub(crate) mod datasource;

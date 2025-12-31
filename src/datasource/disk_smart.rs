@@ -1,6 +1,6 @@
 use crate::metrics::disk_smart::{DataSource, Device, NvmeDevice, SataDevice, SmartReports};
-use futures::stream::FuturesUnordered;
 use futures::StreamExt;
+use futures::stream::FuturesUnordered;
 use serde_json::Value;
 use std::future::Future;
 use tokio::process::Command;

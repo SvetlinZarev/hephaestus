@@ -8,7 +8,7 @@ use tracing_subscriber::filter::LevelFilter;
 use tracing_subscriber::fmt::format::FmtSpan;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
-use tracing_subscriber::{fmt, registry, EnvFilter, Layer, Registry};
+use tracing_subscriber::{EnvFilter, Layer, Registry, fmt, registry};
 
 pub fn setup_logging(cfg: &Log) -> Result<Option<WorkerGuard>, Box<dyn Error + Send + Sync>> {
     let filter = construct_env_filter(cfg);

@@ -3,8 +3,8 @@ use anyhow::Context;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
-use tokio::net::tcp::{ReadHalf, WriteHalf};
 use tokio::net::TcpStream;
+use tokio::net::tcp::{ReadHalf, WriteHalf};
 use tokio::time::Instant;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

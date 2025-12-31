@@ -1,4 +1,4 @@
-pub (super) async fn shutdown_signal() {
+pub(super) async fn shutdown_signal() {
     let ctrl_c = async {
         tokio::signal::ctrl_c()
             .await

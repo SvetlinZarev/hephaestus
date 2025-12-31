@@ -1,5 +1,7 @@
 use crate::datasource::nut;
-use crate::metrics::{cpu_frequency, cpu_usage, disk_io, disk_smart, memory_usage, network_io, ups};
+use crate::metrics::{
+    cpu_frequency, cpu_usage, disk_io, disk_smart, memory_usage, network_io, ups,
+};
 use config::Config;
 use serde::{Deserialize, Serialize};
 use std::path::Path;

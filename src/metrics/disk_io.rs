@@ -1,8 +1,8 @@
 use crate::domain::{Collector, Metric};
 use crate::metrics::no_operation::NoOpCollector;
+use prometheus::Registry;
 use prometheus::core::Desc;
 use prometheus::proto::{LabelPair, MetricFamily, MetricType};
-use prometheus::Registry;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -182,7 +182,10 @@ struct DiskIoCollector<T> {
     data_source: T,
 }
 
-impl<T> DiskIoCollector<T> where T: DataSource {
+impl<T> DiskIoCollector<T>
+where
+    T: DataSource,
+{
     fn new(data_source: T) -> Self {
         Self {
             measurement: Arc::new(Mutex::new(None)),

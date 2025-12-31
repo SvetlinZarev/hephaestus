@@ -35,8 +35,8 @@ impl Reader for TokioReader {
 #[cfg(test)]
 mod tests {
     use crate::datasource::Reader;
-    use std::collections::hash_map::Entry;
     use std::collections::HashMap;
+    use std::collections::hash_map::Entry;
     use std::io::ErrorKind;
     use std::path::Path;
     use std::sync::Mutex;

@@ -1,14 +1,15 @@
 use crate::server::shutdown::shutdown_signal;
 use crate::server::state::AppState;
+use axum::Router;
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use axum::routing::get;
-use axum::Router;
 use std::error::Error;
 use std::net::ToSocketAddrs;
 use std::time::Duration;
 use tokio::net::TcpListener;
 use tower::Layer;
+use tower_http::LatencyUnit;
 use tower_http::catch_panic::CatchPanicLayer;
 use tower_http::normalize_path::NormalizePathLayer;
 use tower_http::request_id::{
@@ -16,7 +17,6 @@ use tower_http::request_id::{
 };
 use tower_http::timeout::TimeoutLayer;
 use tower_http::trace::{DefaultOnResponse, TraceLayer};
-use tower_http::LatencyUnit;
 use tracing::Level;
 
 pub mod handler;
