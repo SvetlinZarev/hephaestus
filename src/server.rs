@@ -67,7 +67,6 @@ pub async fn start_server(state: AppState) -> Result<(), Box<dyn Error + Send + 
 fn create_router(state: AppState) -> Router {
     let router = Router::new()
         .route("/metrics", get(handler::metrics))
-        .route("/health", get(handler::health_check))
         .layer(CatchPanicLayer::new())
         .layer(TimeoutLayer::with_status_code(
             StatusCode::INTERNAL_SERVER_ERROR,
