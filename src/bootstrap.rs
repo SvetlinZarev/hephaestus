@@ -31,7 +31,7 @@ pub fn init_collectors(
     let data_source = datasource::disk_io::DiskIo::new(TokioReader::new());
     collectors.push(disk_io.register(registry, data_source)?);
 
-    let disk_temp = metrics::disk_smart::DiskTemp::new(config.collector.disk_temp.clone());
+    let disk_temp = metrics::disk_smart::Smart::new(config.collector.disk_temp.clone());
     let datasource = datasource::disk_smart::SmartCtl::new();
     collectors.push(disk_temp.register(registry, datasource)?);
 

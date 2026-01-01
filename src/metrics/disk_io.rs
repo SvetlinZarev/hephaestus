@@ -1,8 +1,9 @@
 use crate::domain::{Collector, Metric};
 use crate::metrics::no_operation::NoOpCollector;
+use crate::metrics::util::{into_labels, maybe_counter};
 use prometheus::Registry;
 use prometheus::core::Desc;
-use prometheus::proto::{LabelPair, MetricFamily, MetricType};
+use prometheus::proto::{LabelPair, MetricFamily};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -93,33 +94,8 @@ impl Metrics {
         Ok(())
     }
 
-    fn build_metric_family<F>(&self, desc: &Desc, stats: &DiskIoStats, extract: F) -> MetricFamily
-    where
-        F: Fn(&DeviceIoStats) -> u64,
-    {
-        let mut mf = MetricFamily::default();
-        mf.set_name(desc.fq_name.clone());
-        mf.set_help(desc.help.clone());
-        mf.set_field_type(MetricType::COUNTER);
-
-        let mut metrics = Vec::new();
-        for dev in &stats.disks {
-            let mut m = prometheus::proto::Metric::default();
-
-            let mut lp = LabelPair::default();
-            lp.set_name("device".into());
-            lp.set_value(dev.device_name.clone());
-            m.set_label(vec![lp]);
-
-            let mut c = prometheus::proto::Counter::default();
-            c.set_value(extract(dev) as f64);
-            m.set_counter(c);
-
-            metrics.push(m);
-        }
-
-        mf.set_metric(metrics);
-        mf
+    fn make_labels(&self, device: &DeviceIoStats) -> Vec<LabelPair> {
+        into_labels(&[("device", &device.device_name)])
     }
 }
 
@@ -139,12 +115,16 @@ impl prometheus::core::Collector for Metrics {
             return vec![];
         };
 
-        vec![
-            self.build_metric_family(&self.bytes_read, stats, |d| d.bytes_read),
-            self.build_metric_family(&self.bytes_written, stats, |d| d.bytes_written),
-            self.build_metric_family(&self.read_ops, stats, |d| d.read_ops),
-            self.build_metric_family(&self.write_ops, stats, |d| d.write_ops),
-        ]
+        let mut mf = Vec::with_capacity(stats.disks.len());
+        for device in &stats.disks {
+            let l = self.make_labels(device);
+            maybe_counter(&mut mf, &self.bytes_read, &l, Some(device.bytes_read));
+            maybe_counter(&mut mf, &self.bytes_written, &l, Some(device.bytes_written));
+            maybe_counter(&mut mf, &self.read_ops, &l, Some(device.read_ops));
+            maybe_counter(&mut mf, &self.write_ops, &l, Some(device.write_ops));
+        }
+
+        mf
     }
 }
 

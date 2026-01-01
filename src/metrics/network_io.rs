@@ -1,8 +1,9 @@
 use crate::domain::{Collector, Metric};
 use crate::metrics::no_operation::NoOpCollector;
+use crate::metrics::util::{into_labels, maybe_counter};
 use prometheus::Registry;
 use prometheus::core::Desc;
-use prometheus::proto::{LabelPair, MetricFamily, MetricType};
+use prometheus::proto::{LabelPair, MetricFamily};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -52,39 +53,35 @@ pub struct Metrics {
 }
 
 impl Metrics {
-    pub fn new(state: Arc<Mutex<Option<NetworkIoStats>>>) -> Self {
+    pub fn new(state: Arc<Mutex<Option<NetworkIoStats>>>) -> anyhow::Result<Self> {
         let labels = vec!["device".to_string()];
-        Self {
+        Ok(Self {
             state,
             bytes_sent: Desc::new(
                 "system_network_transmit_bytes_total".into(),
                 "Total bytes sent".into(),
                 labels.clone(),
                 HashMap::new(),
-            )
-            .unwrap(),
+            )?,
             bytes_received: Desc::new(
                 "system_network_receive_bytes_total".into(),
                 "Total bytes received".into(),
                 labels.clone(),
                 HashMap::new(),
-            )
-            .unwrap(),
+            )?,
             packets_sent: Desc::new(
                 "system_network_transmit_packets_total".into(),
                 "Total packets sent".into(),
                 labels.clone(),
                 HashMap::new(),
-            )
-            .unwrap(),
+            )?,
             packets_received: Desc::new(
                 "system_network_receive_packets_total".into(),
                 "Total packets received".into(),
                 labels,
                 HashMap::new(),
-            )
-            .unwrap(),
-        }
+            )?,
+        })
     }
 
     pub fn register(&self, registry: &Registry) -> anyhow::Result<()> {
@@ -92,37 +89,8 @@ impl Metrics {
         Ok(())
     }
 
-    fn build_metric_family<F>(
-        &self,
-        desc: &Desc,
-        stats: &NetworkIoStats,
-        extract: F,
-    ) -> MetricFamily
-    where
-        F: Fn(&InterfaceStats) -> u64,
-    {
-        let mut mf = MetricFamily::default();
-        mf.set_name(desc.fq_name.clone());
-        mf.set_help(desc.help.clone());
-        mf.set_field_type(MetricType::COUNTER);
-
-        let mut metrics = Vec::with_capacity(stats.interfaces.len());
-        for iface in &stats.interfaces {
-            let mut m = prometheus::proto::Metric::default();
-
-            let mut lp = LabelPair::default();
-            lp.set_name("device".into());
-            lp.set_value(iface.interface.clone());
-            m.set_label(vec![lp]);
-
-            let mut c = prometheus::proto::Counter::default();
-            c.set_value(extract(iface) as f64);
-            m.set_counter(c);
-
-            metrics.push(m);
-        }
-        mf.set_metric(metrics);
-        mf
+    fn make_labels(&self, device: &InterfaceStats) -> Vec<LabelPair> {
+        into_labels(&[("device", &device.interface)])
     }
 }
 
@@ -142,12 +110,26 @@ impl prometheus::core::Collector for Metrics {
             return vec![];
         };
 
-        vec![
-            self.build_metric_family(&self.bytes_sent, stats, |i| i.bytes_sent),
-            self.build_metric_family(&self.bytes_received, stats, |i| i.bytes_received),
-            self.build_metric_family(&self.packets_sent, stats, |i| i.packets_sent),
-            self.build_metric_family(&self.packets_received, stats, |i| i.packets_received),
-        ]
+        let mut mf = vec![];
+        for device in &stats.interfaces {
+            let l = self.make_labels(device);
+            maybe_counter(&mut mf, &self.bytes_sent, &l, Some(device.bytes_sent));
+            maybe_counter(
+                &mut mf,
+                &self.bytes_received,
+                &l,
+                Some(device.bytes_received),
+            );
+            maybe_counter(&mut mf, &self.packets_sent, &l, Some(device.packets_sent));
+            maybe_counter(
+                &mut mf,
+                &self.packets_received,
+                &l,
+                Some(device.packets_received),
+            );
+        }
+
+        mf
     }
 }
 pub struct NetworkIo {
@@ -171,7 +153,7 @@ where
         let collector = NetworkIoCollector::new(self.config, data_source);
         let measurements = collector.measurements();
 
-        let metrics = Metrics::new(measurements);
+        let metrics = Metrics::new(measurements)?;
         metrics.register(registry)?;
 
         Ok(Box::new(collector))

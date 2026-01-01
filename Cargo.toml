@@ -15,6 +15,7 @@ futures = "0.3.31"
 # Util
 async-trait = "0.1"
 anyhow = "1"
+num-traits = "0.2.19"
 
 # Configuration
 config = { version = "0.15", default-features = false, features = ["toml", "json"] }

@@ -1,8 +1,9 @@
 use crate::domain::{Collector, Metric};
 use crate::metrics::no_operation::NoOpCollector;
+use crate::metrics::util::{into_labels, maybe_counter, maybe_gauge};
 use prometheus::Registry;
 use prometheus::core::Desc;
-use prometheus::proto::{LabelPair, MetricFamily, MetricType};
+use prometheus::proto::{LabelPair, MetricFamily};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -30,8 +31,8 @@ pub struct SmartReports {
 pub struct SataDevice {
     pub device: Device,
     pub temperature: Option<f64>,
-    pub temperature_min: Option<f64>, // Added
-    pub temperature_max: Option<f64>, // Added
+    pub temperature_min: Option<f64>,
+    pub temperature_max: Option<f64>,
     pub start_stop_count: Option<u64>,
     pub power_on_hours: Option<u64>,
     pub power_cycle_count: Option<u64>,
@@ -286,78 +287,12 @@ impl Metrics {
         Ok(())
     }
 
-    fn gauge(&self, desc: &Desc, label_values: &[LabelPair], value: f64) -> MetricFamily {
-        let mut mf = MetricFamily::default();
-        mf.set_name(desc.fq_name.clone());
-        mf.set_help(desc.help.clone());
-        mf.set_field_type(MetricType::GAUGE);
-
-        let mut m = prometheus::proto::Metric::default();
-        m.set_label(label_values.to_vec());
-
-        let mut g = prometheus::proto::Gauge::default();
-        g.set_value(value);
-        m.set_gauge(g);
-
-        mf.set_metric(vec![m]);
-        mf
-    }
-
-    fn counter(&self, desc: &Desc, label_values: &[LabelPair], value: f64) -> MetricFamily {
-        let mut mf = MetricFamily::default();
-        mf.set_name(desc.fq_name.clone());
-        mf.set_help(desc.help.clone());
-        mf.set_field_type(MetricType::COUNTER);
-
-        let mut m = prometheus::proto::Metric::default();
-        m.set_label(label_values.to_vec());
-
-        let mut c = prometheus::proto::Counter::default();
-        c.set_value(value);
-        m.set_counter(c);
-
-        mf.set_metric(vec![m]);
-        mf
-    }
-
-    fn maybe_gauge(
-        &self,
-        families: &mut Vec<MetricFamily>,
-        desc: &Desc,
-        labels: &[LabelPair],
-        val: Option<f64>,
-    ) {
-        if let Some(v) = val {
-            families.push(self.gauge(desc, labels, v));
-        }
-    }
-
-    fn maybe_counter(
-        &self,
-        families: &mut Vec<MetricFamily>,
-        desc: &Desc,
-        labels: &[LabelPair],
-        val: Option<u64>,
-    ) {
-        if let Some(v) = val {
-            families.push(self.counter(desc, labels, v as f64));
-        }
-    }
-
     fn make_labels(&self, device: &Device) -> Vec<LabelPair> {
-        vec![
+        into_labels(&[
             ("device", &device.device),
             ("model", &device.model),
             ("serial_number", &device.serial_number),
-        ]
-        .into_iter()
-        .map(|(k, v)| {
-            let mut lp = LabelPair::default();
-            lp.set_name(k.into());
-            lp.set_value(v.clone());
-            lp
-        })
-        .collect()
+        ])
     }
 }
 
@@ -401,52 +336,51 @@ impl prometheus::core::Collector for Metrics {
             let l = self.make_labels(&n.device);
             let f = &mut families;
 
-            self.maybe_gauge(f, &self.nvme_temp, &l, n.temperature);
-            self.maybe_gauge(f, &self.nvme_available_spare, &l, n.available_spare);
-            self.maybe_gauge(f, &self.nvme_percent_used, &l, n.percent_used);
-
-            self.maybe_counter(f, &self.nvme_data_read, &l, n.data_units_read);
-            self.maybe_counter(f, &self.nvme_data_written, &l, n.data_units_written);
-            self.maybe_counter(f, &self.nvme_host_reads, &l, n.host_reads);
-            self.maybe_counter(f, &self.nvme_host_writes, &l, n.host_writes);
-            self.maybe_counter(f, &self.nvme_power_on, &l, n.power_on_hours);
-            self.maybe_counter(f, &self.nvme_unsafe_shutdowns, &l, n.unsafe_shutdowns);
-            self.maybe_counter(f, &self.nvme_media_errors, &l, n.media_errors);
+            maybe_gauge(f, &self.nvme_temp, &l, n.temperature);
+            maybe_gauge(f, &self.nvme_available_spare, &l, n.available_spare);
+            maybe_gauge(f, &self.nvme_percent_used, &l, n.percent_used);
+            maybe_counter(f, &self.nvme_data_read, &l, n.data_units_read);
+            maybe_counter(f, &self.nvme_data_written, &l, n.data_units_written);
+            maybe_counter(f, &self.nvme_host_reads, &l, n.host_reads);
+            maybe_counter(f, &self.nvme_host_writes, &l, n.host_writes);
+            maybe_counter(f, &self.nvme_power_on, &l, n.power_on_hours);
+            maybe_counter(f, &self.nvme_unsafe_shutdowns, &l, n.unsafe_shutdowns);
+            maybe_counter(f, &self.nvme_media_errors, &l, n.media_errors);
         }
 
         for s in &stats.sata {
             let l = self.make_labels(&s.device);
             let f = &mut families;
 
-            self.maybe_gauge(f, &self.sata_temp, &l, s.temperature);
-            self.maybe_gauge(f, &self.sata_temp_min, &l, s.temperature_min);
-            self.maybe_gauge(f, &self.sata_temp_max, &l, s.temperature_max);
-            self.maybe_counter(f, &self.sata_start_stop, &l, s.start_stop_count);
-            self.maybe_counter(f, &self.sata_power_on, &l, s.power_on_hours);
-            self.maybe_counter(f, &self.sata_power_cycle, &l, s.power_cycle_count);
-            self.maybe_counter(f, &self.sata_load_cycle, &l, s.load_cycle_count);
-            self.maybe_counter(f, &self.sata_reallocated, &l, s.reallocated_sectors);
-            self.maybe_counter(f, &self.sata_pending, &l, s.pending_sectors);
-            self.maybe_counter(f, &self.sata_uncorrectable, &l, s.uncorrectable_errors);
-            self.maybe_counter(f, &self.sata_crc_errors, &l, s.crc_errors);
-            self.maybe_gauge(f, &self.sata_wear_level, &l, s.wear_level);
+            maybe_gauge(f, &self.sata_temp, &l, s.temperature);
+            maybe_gauge(f, &self.sata_temp_min, &l, s.temperature_min);
+            maybe_gauge(f, &self.sata_temp_max, &l, s.temperature_max);
+            maybe_gauge(f, &self.sata_pending, &l, s.pending_sectors);
+            maybe_gauge(f, &self.sata_reallocated, &l, s.reallocated_sectors);
+            maybe_gauge(f, &self.sata_wear_level, &l, s.wear_level);
+            maybe_counter(f, &self.sata_start_stop, &l, s.start_stop_count);
+            maybe_counter(f, &self.sata_power_on, &l, s.power_on_hours);
+            maybe_counter(f, &self.sata_power_cycle, &l, s.power_cycle_count);
+            maybe_counter(f, &self.sata_load_cycle, &l, s.load_cycle_count);
+            maybe_counter(f, &self.sata_uncorrectable, &l, s.uncorrectable_errors);
+            maybe_counter(f, &self.sata_crc_errors, &l, s.crc_errors);
         }
 
         families
     }
 }
 
-pub struct DiskTemp {
+pub struct Smart {
     config: Config,
 }
 
-impl DiskTemp {
+impl Smart {
     pub fn new(config: Config) -> Self {
         Self { config }
     }
 }
 
-impl<T> Metric<T> for DiskTemp
+impl<T> Metric<T> for Smart
 where
     T: DataSource + Send + Sync + 'static,
 {
@@ -455,7 +389,7 @@ where
             return Ok(Box::new(NoOpCollector::new()));
         }
 
-        let collector = DiskTempCollector::new(data_source);
+        let collector = SmartCollector::new(data_source);
         let measurements = collector.measurements();
 
         let metrics = Metrics::new(measurements)?;
@@ -465,12 +399,12 @@ where
     }
 }
 
-struct DiskTempCollector<T> {
+struct SmartCollector<T> {
     measurements: Arc<Mutex<Option<SmartReports>>>,
     data_source: T,
 }
 
-impl<T> DiskTempCollector<T>
+impl<T> SmartCollector<T>
 where
     T: DataSource + Send + Sync + 'static,
 {
@@ -487,7 +421,7 @@ where
 }
 
 #[async_trait::async_trait]
-impl<T> Collector for DiskTempCollector<T>
+impl<T> Collector for SmartCollector<T>
 where
     T: DataSource + Send + Sync + 'static,
 {
