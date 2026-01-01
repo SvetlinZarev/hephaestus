@@ -370,26 +370,33 @@ impl prometheus::core::Collector for Metrics {
     }
 }
 
-pub struct Smart {
+pub struct Smart<T> {
     config: Config,
+    data_source: T,
 }
 
-impl Smart {
-    pub fn new(config: Config) -> Self {
-        Self { config }
+impl<T> Smart<T>
+where
+    T: DataSource,
+{
+    pub fn new(config: Config, data_source: T) -> Self {
+        Self {
+            config,
+            data_source,
+        }
     }
 }
 
-impl<T> Metric<T> for Smart
+impl<T> Metric for Smart<T>
 where
     T: DataSource + Send + Sync + 'static,
 {
-    fn register(self, registry: &Registry, data_source: T) -> anyhow::Result<Box<dyn Collector>> {
+    fn register(self, registry: &Registry) -> anyhow::Result<Box<dyn Collector>> {
         if !self.config.enabled {
             return Ok(Box::new(NoOpCollector::new()));
         }
 
-        let collector = SmartCollector::new(data_source);
+        let collector = SmartCollector::new(self.data_source);
         let measurements = collector.measurements();
 
         let metrics = Metrics::new(measurements)?;

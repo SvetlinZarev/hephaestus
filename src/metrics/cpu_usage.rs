@@ -47,27 +47,34 @@ pub struct CoreStats {
     pub guest_nice: f64,
 }
 
-pub struct CpuUsage {
+pub struct CpuUsage<T> {
     config: Config,
+    data_source: T,
 }
 
-impl CpuUsage {
-    pub fn new(config: Config) -> Self {
-        Self { config }
+impl<T> CpuUsage<T>
+where
+    T: DataSource,
+{
+    pub fn new(config: Config, data_source: T) -> Self {
+        Self {
+            config,
+            data_source,
+        }
     }
 }
 
-impl<T> Metric<T> for CpuUsage
+impl<T> Metric for CpuUsage<T>
 where
     T: DataSource + Send + Sync + 'static,
 {
-    fn register(self, registry: &Registry, data_source: T) -> anyhow::Result<Box<dyn Collector>> {
+    fn register(self, registry: &Registry) -> anyhow::Result<Box<dyn Collector>> {
         if !self.config.enabled {
             return Ok(Box::new(NoOpCollector::new()));
         }
 
         let metrics = Metrics::register(registry)?;
-        Ok(Box::new(CpuUsageCollector::new(metrics, data_source)))
+        Ok(Box::new(CpuUsageCollector::new(metrics, self.data_source)))
     }
 }
 

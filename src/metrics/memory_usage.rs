@@ -41,21 +41,28 @@ pub trait DataSource {
 }
 
 #[derive(Debug, Clone)]
-pub struct MemoryUsage {
+pub struct MemoryUsage<T> {
     config: Config,
+    data_source: T,
 }
 
-impl MemoryUsage {
-    pub fn new(config: Config) -> Self {
-        Self { config }
+impl<T> MemoryUsage<T>
+where
+    T: DataSource,
+{
+    pub fn new(config: Config, data_source: T) -> Self {
+        Self {
+            config,
+            data_source,
+        }
     }
 }
 
-impl<T> Metric<T> for MemoryUsage
+impl<T> Metric for MemoryUsage<T>
 where
     T: DataSource + Send + Sync + 'static,
 {
-    fn register(self, registry: &Registry, data_source: T) -> anyhow::Result<Box<dyn Collector>> {
+    fn register(self, registry: &Registry) -> anyhow::Result<Box<dyn Collector>> {
         if !self.config.enabled {
             return Ok(Box::new(NoOpCollector::new()));
         }
@@ -70,7 +77,7 @@ where
         Ok(Box::new(MemoryUsageCollector::new(
             ram_metrics,
             swap_metrics,
-            data_source,
+            self.data_source,
         )))
     }
 }
