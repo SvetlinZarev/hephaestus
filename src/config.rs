@@ -93,3 +93,113 @@ pub struct Collectors {
 pub struct DataSources {
     pub nut: nut::Config,
 }
+
+pub fn get_config_base_path<I, S>(args: I) -> anyhow::Result<String>
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<str>,
+{
+    const ARG_CONFIG: &str = "--config";
+    const ARG_CONFIG_EQ: &str = "--config=";
+    const CURRENT_DIRECTORY: &str = "./";
+
+    let mut iter = args.into_iter();
+    while let Some(arg) = iter.next() {
+        let arg = arg.as_ref();
+
+        if arg == ARG_CONFIG {
+            let raw = iter.next();
+            let path = raw
+                .as_ref()
+                .map(|v| v.as_ref().trim())
+                .filter(|v| !v.is_empty())
+                .filter(|v| !v.starts_with("-"))
+                .ok_or_else(|| {
+                    anyhow::anyhow!("Expected configuration path after {}", ARG_CONFIG)
+                })?;
+
+            return Ok(path.to_owned());
+        }
+
+        if let Some(path) = arg.strip_prefix(ARG_CONFIG_EQ) {
+            let path = path.trim();
+
+            if path.is_empty() {
+                return Err(anyhow::anyhow!(
+                    "Expected configuration path for parameter {}",
+                    ARG_CONFIG_EQ
+                ));
+            }
+
+            return Ok(path.to_owned());
+        }
+    }
+
+    Ok(CURRENT_DIRECTORY.to_owned())
+}
+
+pub fn should_print_config_and_exit<I, S>(args: I) -> bool
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<str>,
+{
+    args.into_iter()
+        .inspect(|arg| tracing::debug!(argument = %arg.as_ref()))
+        .any(|arg| arg.as_ref() == "--print-config")
+}
+
+pub fn print_config(config: &Configuration) -> anyhow::Result<()> {
+    println!("{}", toml::to_string(config)?);
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::config::{get_config_base_path, should_print_config_and_exit};
+
+    #[test]
+    fn test_should_print_config_and_exit_cases() {
+        let cases = [
+            (vec![], false),
+            (vec!["--hello"], false),
+            (vec!["--print-config"], true),
+            (vec!["/path", "--print-config", "--hello"], true),
+        ];
+
+        for (args, expected) in cases {
+            assert_eq!(
+                should_print_config_and_exit(&args),
+                expected,
+                "args={:?}; expected={}",
+                args,
+                expected
+            );
+        }
+    }
+
+    #[test]
+    fn test_get_config_base_path() {
+        // (input args, expected result, is_error)
+        let cases = [
+            (vec!["app"], "./", false),
+            (vec!["app", "--config", "/tmp/config"], "/tmp/config", false),
+            (vec!["app", "--foo", "--config", "path"], "path", false),
+            (vec!["app", "--config", "--print-config"], "", true),
+            (vec!["app", "--config=/etc/config"], "/etc/config", false),
+            (vec!["app", "--config=another", "--bar"], "another", false),
+            (vec!["app", "--config"], "", true),
+            (vec!["app", "--config="], "", true),
+            (vec!["app", "--config=   "], "", true),
+        ];
+
+        for (ref args, expected, is_error) in cases {
+            let result = get_config_base_path(args);
+
+            if is_error {
+                assert!(result.is_err(), "Expected error for args: {:?}", args);
+            } else {
+                assert_eq!(result.unwrap(), expected, "Failed for args: {:?}", args);
+            }
+        }
+    }
+}

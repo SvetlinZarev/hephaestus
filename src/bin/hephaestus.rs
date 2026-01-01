@@ -1,5 +1,7 @@
 use hephaestus::bootstrap::init_collectors;
-use hephaestus::config::Configuration;
+use hephaestus::config::{
+    Configuration, get_config_base_path, print_config, should_print_config_and_exit,
+};
 use hephaestus::logging::setup_logging;
 use hephaestus::server::start_server;
 use hephaestus::server::state::{AppState, Inner};
@@ -11,13 +13,13 @@ use tokio::time::Instant;
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let configuration = Configuration::load(get_config_base_path())?;
-    let _guard = setup_logging(&configuration.log)?;
-    if should_print_config_and_exit() {
+    let configuration = Configuration::load(get_config_base_path(std::env::args())?)?;
+    if should_print_config_and_exit(std::env::args()) {
         print_config(&configuration)?;
         return Ok(());
     }
 
+    let _guard = setup_logging(&configuration.log)?;
     tracing::info!("Starting Hephaestus");
 
     let registry = prometheus::Registry::new();
@@ -35,27 +37,5 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     start_server(state).await?;
     tracing::info!("Bye!");
 
-    Ok(())
-}
-
-fn get_config_base_path() -> String {
-    let mut base_path = "./";
-
-    let args = std::env::args().collect::<Vec<_>>();
-    if args.len() >= 2 {
-        base_path = &args[1];
-    }
-
-    base_path.to_owned()
-}
-
-fn should_print_config_and_exit() -> bool {
-    std::env::args()
-        .inspect(|arg| tracing::debug!(argument=%arg))
-        .any(|arg| arg == "--print-config")
-}
-
-fn print_config(config: &Configuration) -> anyhow::Result<()> {
-    println!("{}", toml::to_string(config)?);
     Ok(())
 }
