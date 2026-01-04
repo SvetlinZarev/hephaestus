@@ -31,7 +31,7 @@
 
 <FILE Name="&pluginDir;/&name;">
 <URL>&binaryURL;</URL>
-<MD5>placeholder</MD5>
+<MD5>7da1fd2d9c76e9abc4ba85c02d90637d</MD5>
 </FILE>
 
 <FILE Name="/etc/rc.d/rc.&name;" Mode="0755">
