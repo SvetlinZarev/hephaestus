@@ -7,4 +7,5 @@ pub mod network_io;
 pub mod no_operation;
 pub mod ups;
 mod util;
-pub mod zfs_arc_stat;
+pub mod zfs_arc;
+pub mod zfs_dataset;

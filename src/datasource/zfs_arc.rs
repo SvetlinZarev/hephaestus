@@ -1,5 +1,5 @@
 use crate::datasource::Reader;
-use crate::metrics::zfs_arc_stat::{ArcStats, DataSource};
+use crate::metrics::zfs_arc::{ArcStats, DataSource};
 use tokio::time::Instant;
 
 const PATH_ARCSTATS: &str = "/proc/spl/kstat/zfs/arcstats";
@@ -67,8 +67,8 @@ where
 #[cfg(test)]
 mod tests {
     use crate::datasource::tests::HardcodedReader;
-    use crate::datasource::zfs_arc_stat::{KstatZfs, PATH_ARCSTATS};
-    use crate::metrics::zfs_arc_stat::DataSource;
+    use crate::datasource::zfs_arc::{KstatZfs, PATH_ARCSTATS};
+    use crate::metrics::zfs_arc::DataSource;
 
     fn mock_arcstats_body(hits: u64, misses: u64, size: u64) -> String {
         format!(
