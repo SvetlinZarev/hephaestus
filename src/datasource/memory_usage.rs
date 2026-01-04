@@ -51,72 +51,66 @@ impl<R> DataSource for MemoryUsage<R>
 where
     R: Reader,
 {
-    #[allow(clippy::manual_async_fn)]
-    fn swap(&self) -> impl Future<Output = anyhow::Result<SwapStats>> + Send {
-        async move {
-            let mut total = 0;
-            let mut free = 0;
+    async fn swap(&self) -> anyhow::Result<SwapStats> {
+        let mut total = 0;
+        let mut free = 0;
 
-            let mem_info = self.reader.read_to_string(PATH_MEM_INFO).await?;
-            for line in mem_info.lines() {
-                let Some((key, value)) = self.parse_line(line) else {
-                    continue;
-                };
+        let mem_info = self.reader.read_to_string(PATH_MEM_INFO).await?;
+        for line in mem_info.lines() {
+            let Some((key, value)) = self.parse_line(line) else {
+                continue;
+            };
 
-                match key {
-                    "SwapTotal" => total = value,
-                    "SwapFree" => free = value,
-                    _ => {}
-                }
+            match key {
+                "SwapTotal" => total = value,
+                "SwapFree" => free = value,
+                _ => {}
             }
-
-            let used = total.saturating_sub(free);
-            Ok(SwapStats { total, used, free })
         }
+
+        let used = total.saturating_sub(free);
+        Ok(SwapStats { total, used, free })
     }
 
-    #[allow(clippy::manual_async_fn)]
-    fn ram(&self) -> impl Future<Output = anyhow::Result<RamStats>> + Send {
-        async move {
-            let mut total = 0;
-            let mut free = 0;
-            let mut available = 0;
-            let mut buffers = 0;
-            let mut cached = 0;
-            let mut sreclaimable = 0;
+    async fn ram(&self) -> anyhow::Result<RamStats> {
+        let mut total = 0;
+        let mut free = 0;
+        let mut available = 0;
+        let mut buffers = 0;
+        let mut cached = 0;
+        let mut sreclaimable = 0;
 
-            let mem_info = self.reader.read_to_string(PATH_MEM_INFO).await?;
-            for line in mem_info.lines() {
-                let Some((key, value)) = self.parse_line(line) else {
-                    continue;
-                };
+        let mem_info = self.reader.read_to_string(PATH_MEM_INFO).await?;
+        for line in mem_info.lines() {
+            let Some((key, value)) = self.parse_line(line) else {
+                continue;
+            };
 
-                match key {
-                    "MemTotal" => total = value,
-                    "MemFree" => free = value,
-                    "MemAvailable" => available = value,
-                    "Buffers" => buffers = value,
-                    "Cached" => cached = value,
-                    "SReclaimable" => sreclaimable = value,
-                    _ => {}
-                }
+            match key {
+                "MemTotal" => total = value,
+                "MemFree" => free = value,
+                "MemAvailable" => available = value,
+                "Buffers" => buffers = value,
+                "Cached" => cached = value,
+                "SReclaimable" => sreclaimable = value,
+                _ => {}
             }
-
-            let cache_total = cached + sreclaimable;
-            let used = total
-                .saturating_sub(free)
-                .saturating_sub(buffers)
-                .saturating_sub(cache_total);
-
-            Ok(RamStats {
-                total,
-                used,
-                free,
-                available,
-                buffers,
-                cache: cache_total,
-            })
         }
+
+        let cache_total = cached + sreclaimable;
+        let used = total
+            .saturating_sub(free)
+            .saturating_sub(buffers)
+            .saturating_sub(cache_total);
+
+        Ok(RamStats {
+            total,
+            used,
+            free,
+            available,
+            buffers,
+            cache: cache_total,
+        })
     }
 }
 

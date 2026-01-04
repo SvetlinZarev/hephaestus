@@ -2,7 +2,6 @@ use crate::metrics::disk_smart::{DataSource, Device, NvmeDevice, SataDevice, Sma
 use futures::StreamExt;
 use futures::stream::FuturesUnordered;
 use serde_json::Value;
-use std::future::Future;
 use tokio::process::Command;
 use tokio::time::Instant;
 
@@ -145,37 +144,34 @@ impl SmartCtl {
 }
 
 impl DataSource for SmartCtl {
-    #[allow(clippy::manual_async_fn)]
-    fn disk_temps(&self) -> impl Future<Output = anyhow::Result<SmartReports>> + Send {
-        async move {
-            let device_paths = self.scan_devices().await?;
+    async fn disk_temps(&self) -> anyhow::Result<SmartReports> {
+        let device_paths = self.scan_devices().await?;
 
-            let mut tasks = FuturesUnordered::new();
-            for path in device_paths {
-                tasks.push(async move { self.query_device(&path).await.map_err(|e| (path, e)) });
-            }
+        let mut tasks = FuturesUnordered::new();
+        for path in device_paths {
+            tasks.push(async move { self.query_device(&path).await.map_err(|e| (path, e)) });
+        }
 
-            let mut sata = Vec::new();
-            let mut nvme = Vec::new();
+        let mut sata = Vec::new();
+        let mut nvme = Vec::new();
 
-            while let Some(result) = tasks.next().await {
-                match result {
-                    Ok(Some(DeviceReport::Sata(s))) => sata.push(s),
-                    Ok(Some(DeviceReport::Nvme(n))) => nvme.push(n),
-                    Ok(None) => {
-                        tracing::debug!("Skipping device, because it's in low-power state");
-                    }
-                    Err((path, e)) => {
-                        tracing::warn!(device = %path, error = %e, "Failed to query device SMART data");
-                    }
+        while let Some(result) = tasks.next().await {
+            match result {
+                Ok(Some(DeviceReport::Sata(s))) => sata.push(s),
+                Ok(Some(DeviceReport::Nvme(n))) => nvme.push(n),
+                Ok(None) => {
+                    tracing::debug!("Skipping device, because it's in low-power state");
+                }
+                Err((path, e)) => {
+                    tracing::warn!(device = %path, error = %e, "Failed to query device SMART data");
                 }
             }
-
-            Ok(SmartReports {
-                timestamp: Instant::now(),
-                sata,
-                nvme,
-            })
         }
+
+        Ok(SmartReports {
+            timestamp: Instant::now(),
+            sata,
+            nvme,
+        })
     }
 }

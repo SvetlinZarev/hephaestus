@@ -22,74 +22,71 @@ impl<R> DataSource for DiskIo<R>
 where
     R: Reader,
 {
-    #[allow(clippy::manual_async_fn)]
-    fn disk_io(&self) -> impl Future<Output = anyhow::Result<DiskIoStats>> + Send {
-        async move {
-            let content = self.reader.read_to_string(PATH_DISK_STATS).await?;
-            let timestamp = Instant::now();
+    async fn disk_io(&self) -> anyhow::Result<DiskIoStats> {
+        let content = self.reader.read_to_string(PATH_DISK_STATS).await?;
+        let timestamp = Instant::now();
 
-            let mut disks = Vec::new();
-            for line in content.lines() {
-                let mut parts = line.split_whitespace();
+        let mut disks = Vec::new();
+        for line in content.lines() {
+            let mut parts = line.split_whitespace();
 
-                // Skip major and minor numbers (Columns 0 and 1)
-                parts.next();
-                parts.next();
+            // Skip major and minor numbers (Columns 0 and 1)
+            parts.next();
+            parts.next();
 
-                // Column 2: Device Name
-                let Some(device) = parts.next() else {
-                    tracing::debug!("Missing device name: {}", line);
-                    continue;
-                };
+            // Column 2: Device Name
+            let Some(device) = parts.next() else {
+                tracing::debug!("Missing device name: {}", line);
+                continue;
+            };
 
-                if device.starts_with("loop")
-                    || device.starts_with("zram")
-                    || device.starts_with("md1p")
-                {
-                    tracing::debug!("Skipping device: {}", device);
-                    continue;
-                }
-
-                // Column 3: Reads Completed
-                let read_ops = parts.next().and_then(|v| v.parse().ok()).unwrap_or(0);
-
-                // Column 4: Reads Merged (skip)
-                parts.next();
-
-                // Column 5: Sectors Read -> Bytes
-                let sectors_read = parts
-                    .next()
-                    .and_then(|v| v.parse::<u64>().ok())
-                    .unwrap_or(0);
-                let bytes_read = sectors_read * KERNEL_SECTOR_SIZE;
-
-                // Column 6: Time spent reading (skip)
-                parts.next();
-
-                // Column 7: Writes Completed
-                let write_ops = parts.next().and_then(|v| v.parse().ok()).unwrap_or(0);
-
-                // Column 8: Writes Merged (skip)
-                parts.next();
-
-                // Column 9: Sectors Written -> Bytes
-                let sectors_written = parts
-                    .next()
-                    .and_then(|v| v.parse::<u64>().ok())
-                    .unwrap_or(0);
-                let bytes_written = sectors_written * KERNEL_SECTOR_SIZE;
-
-                disks.push(DeviceIoStats {
-                    device_name: device.to_string(),
-                    bytes_read,
-                    bytes_written,
-                    read_ops,
-                    write_ops,
-                });
+            if device.starts_with("loop")
+                || device.starts_with("zram")
+                || device.starts_with("md1p")
+            {
+                tracing::debug!("Skipping device: {}", device);
+                continue;
             }
 
-            Ok(DiskIoStats { timestamp, disks })
+            // Column 3: Reads Completed
+            let read_ops = parts.next().and_then(|v| v.parse().ok()).unwrap_or(0);
+
+            // Column 4: Reads Merged (skip)
+            parts.next();
+
+            // Column 5: Sectors Read -> Bytes
+            let sectors_read = parts
+                .next()
+                .and_then(|v| v.parse::<u64>().ok())
+                .unwrap_or(0);
+            let bytes_read = sectors_read * KERNEL_SECTOR_SIZE;
+
+            // Column 6: Time spent reading (skip)
+            parts.next();
+
+            // Column 7: Writes Completed
+            let write_ops = parts.next().and_then(|v| v.parse().ok()).unwrap_or(0);
+
+            // Column 8: Writes Merged (skip)
+            parts.next();
+
+            // Column 9: Sectors Written -> Bytes
+            let sectors_written = parts
+                .next()
+                .and_then(|v| v.parse::<u64>().ok())
+                .unwrap_or(0);
+            let bytes_written = sectors_written * KERNEL_SECTOR_SIZE;
+
+            disks.push(DeviceIoStats {
+                device_name: device.to_string(),
+                bytes_read,
+                bytes_written,
+                read_ops,
+                write_ops,
+            });
         }
+
+        Ok(DiskIoStats { timestamp, disks })
     }
 }
 

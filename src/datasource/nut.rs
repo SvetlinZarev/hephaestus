@@ -151,34 +151,32 @@ impl Nut {
 }
 
 impl DataSource for Nut {
-    fn ups_stats(&self) -> impl Future<Output = anyhow::Result<UpsStats>> + Send {
+    async fn ups_stats(&self) -> anyhow::Result<UpsStats> {
         let addr = format!("{}:{}", self.config.address, self.config.port);
         tracing::debug!(%addr, "Trying to connect to NUT server");
 
-        async move {
-            let mut stream = TcpStream::connect(&addr)
-                .await
-                .with_context(|| format!("Failed to connect to NUT server at [{}]", addr))?;
+        let mut stream = TcpStream::connect(&addr)
+            .await
+            .with_context(|| format!("Failed to connect to NUT server at [{}]", addr))?;
 
-            let (reader, mut writer) = stream.split();
-            let mut reader = BufReader::new(reader);
+        let (reader, mut writer) = stream.split();
+        let mut reader = BufReader::new(reader);
 
-            let mut devices = vec![];
-            let ups_devices = self.list_ups_devices(&mut reader, &mut writer).await?;
+        let mut devices = vec![];
+        let ups_devices = self.list_ups_devices(&mut reader, &mut writer).await?;
 
-            for device in ups_devices {
-                let parameters = self
-                    .list_device_parameters(&mut reader, &mut writer, &device)
-                    .await?;
+        for device in ups_devices {
+            let parameters = self
+                .list_device_parameters(&mut reader, &mut writer, &device)
+                .await?;
 
-                let device_stats = self.collect_device_parameters(device, parameters);
-                devices.push(device_stats);
-            }
-
-            Ok(UpsStats {
-                timestamp: Instant::now(),
-                devices,
-            })
+            let device_stats = self.collect_device_parameters(device, parameters);
+            devices.push(device_stats);
         }
+
+        Ok(UpsStats {
+            timestamp: Instant::now(),
+            devices,
+        })
     }
 }

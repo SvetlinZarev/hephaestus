@@ -21,49 +21,46 @@ impl<R> DataSource for NetworkIo<R>
 where
     R: Reader,
 {
-    #[allow(clippy::manual_async_fn)]
-    fn network_io(&self) -> impl Future<Output = anyhow::Result<NetworkIoStats>> + Send {
-        async move {
-            let content = self.reader.read_to_string(PATH_NET_DEV).await?;
-            let timestamp = Instant::now();
-            let mut interfaces = Vec::new();
+    async fn network_io(&self) -> anyhow::Result<NetworkIoStats> {
+        let content = self.reader.read_to_string(PATH_NET_DEV).await?;
+        let timestamp = Instant::now();
+        let mut interfaces = Vec::new();
 
-            for line in content.lines().skip(2) {
-                let line = line.trim();
-                if line.is_empty() {
-                    continue;
-                }
-
-                let Some((iface, stats)) = line.split_once(':') else {
-                    tracing::debug!("Unexpected line while parsing network io stats: {}", line);
-                    continue;
-                };
-
-                let mut stats = stats.split_whitespace();
-
-                let bytes_received = stats.next().and_then(|v| v.parse().ok()).unwrap_or(0);
-                let packets_received = stats.next().and_then(|v| v.parse().ok()).unwrap_or(0);
-
-                // Skip remaining 6 receive columns (errs, drop, fifo, frame, compressed, multicast)
-                stats.nth(5);
-
-                let bytes_sent = stats.next().and_then(|v| v.parse().ok()).unwrap_or(0);
-                let packets_sent = stats.next().and_then(|v| v.parse().ok()).unwrap_or(0);
-
-                interfaces.push(InterfaceStats {
-                    interface: iface.trim().to_string(),
-                    bytes_sent,
-                    bytes_received,
-                    packets_sent,
-                    packets_received,
-                });
+        for line in content.lines().skip(2) {
+            let line = line.trim();
+            if line.is_empty() {
+                continue;
             }
 
-            Ok(NetworkIoStats {
-                timestamp,
-                interfaces,
-            })
+            let Some((iface, stats)) = line.split_once(':') else {
+                tracing::debug!("Unexpected line while parsing network io stats: {}", line);
+                continue;
+            };
+
+            let mut stats = stats.split_whitespace();
+
+            let bytes_received = stats.next().and_then(|v| v.parse().ok()).unwrap_or(0);
+            let packets_received = stats.next().and_then(|v| v.parse().ok()).unwrap_or(0);
+
+            // Skip remaining 6 receive columns (errs, drop, fifo, frame, compressed, multicast)
+            stats.nth(5);
+
+            let bytes_sent = stats.next().and_then(|v| v.parse().ok()).unwrap_or(0);
+            let packets_sent = stats.next().and_then(|v| v.parse().ok()).unwrap_or(0);
+
+            interfaces.push(InterfaceStats {
+                interface: iface.trim().to_string(),
+                bytes_sent,
+                bytes_received,
+                packets_sent,
+                packets_received,
+            });
         }
+
+        Ok(NetworkIoStats {
+            timestamp,
+            interfaces,
+        })
     }
 }
 

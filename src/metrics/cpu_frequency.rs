@@ -20,7 +20,7 @@ pub struct CpuFreqStats {
 }
 
 pub trait DataSource {
-    fn cpy_freq(&self) -> impl Future<Output = anyhow::Result<CpuFreqStats>> + Send;
+    fn cpu_freq(&self) -> impl Future<Output = anyhow::Result<CpuFreqStats>> + Send;
 }
 
 #[derive(Clone)]
@@ -99,7 +99,7 @@ where
     T: DataSource + Send + Sync + 'static,
 {
     async fn collect(&self) -> anyhow::Result<()> {
-        let stats = self.data_source.cpy_freq().await?;
+        let stats = self.data_source.cpu_freq().await?;
         for (core, &freq) in stats.cores.iter().enumerate() {
             self.metrics
                 .core_freq

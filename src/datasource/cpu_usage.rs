@@ -44,70 +44,67 @@ impl<R> DataSource for CpuUsage<R>
 where
     R: Reader,
 {
-    #[allow(clippy::manual_async_fn)]
-    fn cpu_usage(&self) -> impl Future<Output = anyhow::Result<CpuUsageStats>> + Send {
-        async move {
-            let Ok(mut previous) = self.measurement.lock().map(|x| x.clone()) else {
-                return Err(anyhow::anyhow!(
-                    "Failed to retrieve previous CPU usage measurement snapshot due to a poisoned lock"
-                ));
-            };
+    async fn cpu_usage(&self) -> anyhow::Result<CpuUsageStats> {
+        let Ok(mut previous) = self.measurement.lock().map(|x| x.clone()) else {
+            return Err(anyhow::anyhow!(
+                "Failed to retrieve previous CPU usage measurement snapshot due to a poisoned lock"
+            ));
+        };
 
-            let (timestamp, previous) = match previous.take() {
-                Some(previous) => previous,
-                None => {
-                    let measurement = make_measurement(&self.reader).await?;
-                    (Instant::now(), measurement)
-                }
-            };
-
-            let time_since_measurement = timestamp.elapsed();
-            if time_since_measurement < MIN_TIME_BETWEEN_MEASUREMENTS {
-                let to_sleep = MIN_TIME_BETWEEN_MEASUREMENTS.saturating_sub(time_since_measurement);
-                tokio::time::sleep(to_sleep).await;
+        let (timestamp, previous) = match previous.take() {
+            Some(previous) => previous,
+            None => {
+                let measurement = make_measurement(&self.reader).await?;
+                (Instant::now(), measurement)
             }
+        };
 
-            let current = make_measurement(&self.reader).await?;
-            let now = Instant::now();
-            if previous.len() != current.len() {
-                return Err(anyhow::anyhow!(
-                    "Failed to perform CPU usage measurement because of changed core count: previous={}; current={}",
-                    previous.len(),
-                    current.len()
-                ));
-            }
-
-            let (total_usage, total_breakdown) = calculate_usage(&current[0], &previous[0]);
-            let cores = previous
-                .iter()
-                .zip(current.iter())
-                .skip(1) // the first element is the "total" CPU usage across all cores
-                .map(|(prev, curr)| calculate_usage(curr, prev))
-                .enumerate()
-                .map(|(core, (total_usage, breakdown))| CoreUsageStats {
-                    core,
-                    total_usage,
-                    breakdown,
-                })
-                .collect::<Vec<_>>();
-
-            match self.measurement.lock() {
-                Ok(mut guard) => {
-                    *guard = Some((now, current));
-                }
-                Err(_) => {
-                    return Err(anyhow::anyhow!(
-                        "Failed to update CPU usage measurement snapshot due to a poisoned lock"
-                    ));
-                }
-            }
-
-            Ok(CpuUsageStats {
-                total_usage,
-                total_breakdown,
-                cores,
-            })
+        let time_since_measurement = timestamp.elapsed();
+        if time_since_measurement < MIN_TIME_BETWEEN_MEASUREMENTS {
+            let to_sleep = MIN_TIME_BETWEEN_MEASUREMENTS.saturating_sub(time_since_measurement);
+            tokio::time::sleep(to_sleep).await;
         }
+
+        let current = make_measurement(&self.reader).await?;
+        let now = Instant::now();
+        if previous.len() != current.len() {
+            return Err(anyhow::anyhow!(
+                "Failed to perform CPU usage measurement because of changed core count: previous={}; current={}",
+                previous.len(),
+                current.len()
+            ));
+        }
+
+        let (total_usage, total_breakdown) = calculate_usage(&current[0], &previous[0]);
+        let cores = previous
+            .iter()
+            .zip(current.iter())
+            .skip(1) // the first element is the "total" CPU usage across all cores
+            .map(|(prev, curr)| calculate_usage(curr, prev))
+            .enumerate()
+            .map(|(core, (total_usage, breakdown))| CoreUsageStats {
+                core,
+                total_usage,
+                breakdown,
+            })
+            .collect::<Vec<_>>();
+
+        match self.measurement.lock() {
+            Ok(mut guard) => {
+                *guard = Some((now, current));
+            }
+            Err(_) => {
+                return Err(anyhow::anyhow!(
+                    "Failed to update CPU usage measurement snapshot due to a poisoned lock"
+                ));
+            }
+        }
+
+        Ok(CpuUsageStats {
+            total_usage,
+            total_breakdown,
+            cores,
+        })
     }
 }
 
