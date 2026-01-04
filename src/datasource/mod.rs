@@ -7,6 +7,7 @@ pub mod disk_smart;
 pub mod memory_usage;
 pub mod network_io;
 pub mod nut;
+pub mod zfs_arc_stat;
 
 pub trait Reader: Send + Sync {
     fn read_to_string(

@@ -45,5 +45,9 @@ pub fn init_collectors(
     let ups = metrics::ups::Ups::new(config.collector.ups.clone(), data_source);
     collectors.push(ups.register(registry)?);
 
+    let data_source = datasource::zfs_arc_stat::KstatZfs::new(TokioReader::new());
+    let zfs_arc = metrics::zfs_arc_stat::ZfsArc::new(config.collector.zfs_arc.clone(), data_source);
+    collectors.push(zfs_arc.register(registry)?);
+
     Ok(collectors)
 }
