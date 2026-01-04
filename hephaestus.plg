@@ -86,6 +86,7 @@ esac
 <FILE Run="/bin/bash" Method="remove">
 <INLINE>
   /etc/rc.d/rc.&name; stop
+  rm -rf &pluginDir;/&name;
   rm -f /usr/local/sbin/&name;
   rm -f /etc/rc.d/rc.&name;
   rm -rf &logDir;
