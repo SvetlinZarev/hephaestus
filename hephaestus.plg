@@ -31,6 +31,7 @@
 
 <FILE Name="&pluginDir;/&name;">
 <URL>&binaryURL;</URL>
+<MD5>placeholder</MD5>
 </FILE>
 
 <FILE Name="/etc/rc.d/rc.&name;" Mode="0755">

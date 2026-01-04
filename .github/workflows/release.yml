@@ -58,6 +58,26 @@ jobs:
       - name: Prepare Binary
         run: cp target/x86_64-unknown-linux-musl/release/hephaestus ./hephaestus_linux_amd64
 
+      - name: Update PLG version and MD5
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          NEW_VERSION=$(date +'%Y.%m.%d')
+          TAG_VERSION=${GITHUB_REF#refs/tags/v}
+          BINARY_MD5=$(md5sum hephaestus_linux_amd64 | awk '{ print $1 }')
+          echo "Updating PLG to Version: $TAG_VERSION with MD5: $BINARY_MD5 and version string $NEW_VERSION"
+          sed -i "s/<!ENTITY version   \".*\">/<!ENTITY version   \"$NEW_VERSION\">/" hephaestus.plg
+          sed -i "s|<MD5>.*</MD5>|<MD5>$BINARY_MD5</MD5>|" hephaestus.plg
+
+      - name: Commit and Push updated PLG
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git fetch origin main
+          git add hephaestus.plg
+          git commit -m "chore: release update hephaestus.plg to ${GITHUB_REF#refs/tags/} [skip ci]"
+          git push origin HEAD:main
+
       - name: Create Draft Release (Main Branch)
         if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v1
