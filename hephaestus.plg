@@ -3,15 +3,18 @@
   <!ENTITY name      "hephaestus">
   <!ENTITY author    "SvetlinZarev">
   <!ENTITY version   "2025.12.31">
-  <!ENTITY pluginURL "https://raw.githubusercontent.com/&author;/Hephaestus/master/&name;.plg">
-  <!ENTITY binaryURL "https://github.com/&author;/Hephaestus/releases/latest/download/hephaestus_linux_amd64">
+  <!ENTITY pluginURL "https://raw.githubusercontent.com/&author;/hephaestus/master/&name;.plg">
+  <!ENTITY binaryURL "https://github.com/&author;/hephaestus/releases/latest/download/hephaestus_linux_amd64">
   <!ENTITY pluginDir "/boot/config/plugins/&name;">
   <!ENTITY logDir    "/var/log/&name;">
 ]>
 
-<PLUGIN name="&name;" author="&author;" version="&version;" pluginURL="&pluginURL;" min="6.9.0">
+<PLUGIN name="&name;" author="&author;" version="&version;" pluginURL="&pluginURL;" min="7.0.0">
 
 <CHANGES>
+###2026.01.04
+- Add ZFS ARC and dataset metrics
+
 ###2025.12.31
 - Initial Release
 </CHANGES>
