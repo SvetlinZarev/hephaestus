@@ -63,7 +63,7 @@ impl DataSource for DockerClient {
 
                 let cpus = cpu_stats.online_cpus.unwrap_or(1) as f64;
                 let cpu_pct = if sys_delta > 0.0 {
-                    (cpu_delta / sys_delta) * cpus * 100.0
+                    (cpu_delta / sys_delta) * cpus
                 } else {
                     0.0
                 };
