@@ -1,25 +1,26 @@
 use crate::metrics::docker::{ContainerStats, DataSource, DockerStats};
-use bollard::Docker;
+use anyhow::Context;
 use bollard::query_parameters::{ListContainersOptionsBuilder, StatsOptions};
 use futures::StreamExt;
 use tokio::time::Instant;
 
 pub struct DockerClient {
-    docker: Docker,
+    //
 }
 
 impl DockerClient {
-    pub fn new() -> anyhow::Result<Self> {
-        Ok(Self {
-            docker: Docker::connect_with_local_defaults()?,
-        })
+    pub fn new() -> Self {
+        Self {}
     }
 }
 
 impl DataSource for DockerClient {
     async fn docker_stats(&self) -> anyhow::Result<DockerStats> {
+        let docker = bollard::Docker::connect_with_unix_defaults()
+            .context("Is the docker daemon running?")?;
+
         let params = ListContainersOptionsBuilder::new().all(false).build();
-        let containers = self.docker.list_containers(Some(params)).await?;
+        let containers = docker.list_containers(Some(params)).await?;
 
         let mut container_stats = Vec::new();
         for container in containers {
@@ -33,7 +34,7 @@ impl DataSource for DockerClient {
                 .trim_start_matches('/')
                 .to_string();
 
-            let mut stream = self.docker.stats(
+            let mut stream = docker.stats(
                 &id,
                 Some(StatsOptions {
                     stream: false,

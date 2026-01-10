@@ -54,7 +54,7 @@ pub fn init_collectors(
         metrics::zfs_dataset::ZfsDatasetIo::new(config.collector.zfs_dataset.clone(), data_source);
     collectors.push(zfs_dataset.register(registry)?);
 
-    let data_source = datasource::docker::DockerClient::new()?;
+    let data_source = datasource::docker::DockerClient::new();
     let docker = metrics::docker::Docker::new(config.collector.docker.clone(), data_source);
     collectors.push(docker.register(registry)?);
 
