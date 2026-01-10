@@ -48,14 +48,12 @@ impl DataSource for DockerClient {
                 // Fix E0609: Handle nested Option<ContainerCpuUsage>
                 let current_usage = cpu_stats
                     .cpu_usage
-                    .map(|u| u.total_usage)
-                    .flatten()
+                    .and_then(|u| u.total_usage)
                     .unwrap_or_default() as f64;
 
                 let pre_usage = precpu_stats
                     .cpu_usage
-                    .map(|u| u.total_usage)
-                    .flatten()
+                    .and_then(|u| u.total_usage)
                     .unwrap_or_default() as f64;
 
                 let cpu_delta = current_usage - pre_usage;

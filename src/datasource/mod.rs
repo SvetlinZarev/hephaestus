@@ -4,13 +4,12 @@ pub mod cpu_frequency;
 pub mod cpu_usage;
 pub mod disk_io;
 pub mod disk_smart;
+pub mod docker;
 pub mod memory_usage;
 pub mod network_io;
 pub mod nut;
 pub mod zfs_arc;
 pub mod zfs_dataset;
-pub mod docker;
-
 
 pub trait Reader: Send + Sync {
     fn read_to_string(

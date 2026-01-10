@@ -1,9 +1,9 @@
 use crate::domain::{Collector, Metric};
 use crate::metrics::no_operation::NoOpCollector;
 use crate::metrics::util::{into_labels, maybe_counter, maybe_gauge, update_measurement_if};
+use prometheus::Registry;
 use prometheus::core::Desc;
 use prometheus::proto::{LabelPair, MetricFamily};
-use prometheus::Registry;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
