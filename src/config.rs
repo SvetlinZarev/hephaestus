@@ -1,6 +1,6 @@
 use crate::datasource::nut;
 use crate::metrics::{
-    cpu_frequency, cpu_usage, disk_io, disk_smart, memory_usage, network_io, ups, zfs_arc,
+    cpu_frequency, cpu_usage, disk_io, disk_smart, docker, memory_usage, network_io, ups, zfs_arc,
     zfs_dataset,
 };
 use config::Config;
@@ -90,6 +90,7 @@ pub struct Collectors {
     pub ups: ups::Config,
     pub zfs_arc: zfs_arc::Config,
     pub zfs_dataset: zfs_dataset::Config,
+    pub docker: docker::Config,
 }
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]

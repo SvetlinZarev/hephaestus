@@ -9,3 +9,4 @@ pub mod ups;
 mod util;
 pub mod zfs_arc;
 pub mod zfs_dataset;
+pub mod docker;
