@@ -1,6 +1,6 @@
 use crate::metrics::docker::{ContainerStats, DataSource, DockerStats};
-use bollard::query_parameters::{ListContainersOptionsBuilder, StatsOptions};
 use bollard::Docker;
+use bollard::query_parameters::{ListContainersOptionsBuilder, StatsOptions};
 use futures::StreamExt;
 use tokio::time::Instant;
 
