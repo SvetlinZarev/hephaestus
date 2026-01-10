@@ -12,6 +12,9 @@
 <PLUGIN name="&name;" author="&author;" version="&version;" pluginURL="&pluginURL;" min="7.0.0">
 
 <CHANGES>
+###2026.01.10
+- Expose docker container statistics (cpu, memory, network io)
+
 ###2026.01.04
 - Add ZFS ARC and dataset metrics
 
