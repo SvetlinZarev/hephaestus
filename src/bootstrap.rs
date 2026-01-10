@@ -41,7 +41,7 @@ pub fn init_collectors(
         metrics::disk_smart::Smart::new(config.collector.disk_temp.clone(), data_source);
     collectors.push(disk_temp.register(registry)?);
 
-    let data_source = datasource::nut::Nut::new(config.datasource.nut.clone());
+    let data_source = datasource::nut::Nut::new(config.datasource.nut.clone())?;
     let ups = metrics::ups::Ups::new(config.collector.ups.clone(), data_source);
     collectors.push(ups.register(registry)?);
 

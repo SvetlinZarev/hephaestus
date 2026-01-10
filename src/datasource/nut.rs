@@ -2,6 +2,7 @@ use crate::metrics::ups::{DataSource, UpsDeviceStats, UpsStats};
 use anyhow::Context;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::net::SocketAddr;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::TcpStream;
 use tokio::net::tcp::{ReadHalf, WriteHalf};
@@ -23,12 +24,18 @@ impl Default for Config {
 }
 
 pub struct Nut {
-    config: Config,
+    addr: SocketAddr,
 }
 
 impl Nut {
-    pub fn new(config: Config) -> Self {
-        Self { config }
+    pub fn new(config: Config) -> anyhow::Result<Self> {
+        let addr = format!("{}:{}", config.address, config.port);
+
+        let addr: SocketAddr = addr
+            .parse()
+            .with_context(|| format!("Invalid socket address: [{}]", addr))?;
+
+        Ok(Self { addr })
     }
 
     async fn list_ups_devices(
@@ -152,12 +159,9 @@ impl Nut {
 
 impl DataSource for Nut {
     async fn ups_stats(&self) -> anyhow::Result<UpsStats> {
-        let addr = format!("{}:{}", self.config.address, self.config.port);
-        tracing::debug!(%addr, "Trying to connect to NUT server");
-
-        let mut stream = TcpStream::connect(&addr)
+        let mut stream = TcpStream::connect(&self.addr)
             .await
-            .with_context(|| format!("Failed to connect to NUT server at [{}]", addr))?;
+            .with_context(|| format!("Failed to connect to NUT server at [{}]", &self.addr))?;
 
         let (reader, mut writer) = stream.split();
         let mut reader = BufReader::new(reader);
