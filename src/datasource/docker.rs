@@ -2,7 +2,7 @@ use crate::metrics::docker::{ContainerStats, DataSource, DockerStats};
 use anyhow::Context;
 use std::collections::HashMap;
 
-use bollard::models::{ContainerCpuStats, ContainerSummary};
+use bollard::models::{ContainerCpuStats, ContainerMemoryStats, ContainerSummary};
 use bollard::query_parameters::{ListContainersOptionsBuilder, StatsOptionsBuilder};
 use futures::StreamExt;
 use tokio::sync::Mutex;
@@ -66,7 +66,7 @@ impl DataSource for DockerClient {
                     current_cpu_stats.insert(name.clone(), measurement);
                 }
 
-                let mem_usage_bytes = s.memory_stats.as_ref().and_then(|m| m.usage);
+                let mem_usage_bytes = calculate_memory_usage(s.memory_stats.as_ref());
 
                 let (mut rx, mut tx) = (None, None);
                 if let Some(net) = s.networks.as_ref() {
@@ -153,4 +153,14 @@ fn total_cpu_usage(stats: &ContainerCpuStats) -> Option<u64> {
 
 fn system_cpu_usage(stats: &ContainerCpuStats) -> Option<u64> {
     stats.system_cpu_usage
+}
+
+fn calculate_memory_usage(stats: Option<&ContainerMemoryStats>) -> Option<u64> {
+    let stats = stats?;
+    let mem_stats = stats.stats.as_ref()?;
+
+    let usage = stats.usage?;
+    let inactive_file = mem_stats.get("inactive_file").copied().unwrap_or(0);
+
+    Some(usage.saturating_sub(inactive_file))
 }
