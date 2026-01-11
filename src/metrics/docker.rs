@@ -12,10 +12,10 @@ use tokio::time::Instant;
 #[derive(Debug, Clone)]
 pub struct ContainerStats {
     pub name: String,
-    pub cpu_usage_pct: f64,
-    pub mem_usage_bytes: f64,
-    pub net_rx_bytes: u64,
-    pub net_tx_bytes: u64,
+    pub cpu_usage: Option<f64>,
+    pub mem_usage_bytes: Option<u64>,
+    pub net_rx_bytes: Option<u64>,
+    pub net_tx_bytes: Option<u64>,
 }
 
 #[derive(Debug, Clone)]
@@ -94,15 +94,10 @@ impl prometheus::core::Collector for Metrics {
         let mut mf = Vec::with_capacity(stats.containers.len() * 4);
         for container in &stats.containers {
             let l = self.make_labels(container);
-            maybe_gauge(&mut mf, &self.cpu_usage, &l, Some(container.cpu_usage_pct));
-            maybe_gauge(
-                &mut mf,
-                &self.mem_usage,
-                &l,
-                Some(container.mem_usage_bytes),
-            );
-            maybe_counter(&mut mf, &self.net_rx, &l, Some(container.net_rx_bytes));
-            maybe_counter(&mut mf, &self.net_tx, &l, Some(container.net_tx_bytes));
+            maybe_gauge(&mut mf, &self.cpu_usage, &l, container.cpu_usage);
+            maybe_gauge(&mut mf, &self.mem_usage, &l, container.mem_usage_bytes);
+            maybe_counter(&mut mf, &self.net_rx, &l, container.net_rx_bytes);
+            maybe_counter(&mut mf, &self.net_tx, &l, container.net_tx_bytes);
         }
 
         mf
