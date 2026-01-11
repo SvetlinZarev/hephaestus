@@ -149,6 +149,7 @@ impl<T> Collector for ZfsCollector<T>
 where
     T: DataSource + Send + Sync + 'static,
 {
+    #[tracing::instrument(level = "debug", skip_all)]
     async fn collect(&self) -> anyhow::Result<()> {
         let stats = self.data_source.arc_stats().await?;
         let guard = self.measurement.lock().unwrap_or_else(|e| e.into_inner());

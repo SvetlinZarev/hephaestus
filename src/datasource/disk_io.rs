@@ -22,6 +22,7 @@ impl<R> DataSource for DiskIo<R>
 where
     R: Reader,
 {
+    #[tracing::instrument(level = "debug", skip_all)]
     async fn disk_io(&self) -> anyhow::Result<DiskIoStats> {
         let content = self.reader.read_to_string(PATH_DISK_STATS).await?;
         let timestamp = Instant::now();

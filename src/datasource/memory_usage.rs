@@ -51,6 +51,7 @@ impl<R> DataSource for MemoryUsage<R>
 where
     R: Reader,
 {
+    #[tracing::instrument(level = "debug", skip_all)]
     async fn swap(&self) -> anyhow::Result<SwapStats> {
         let mut total = 0;
         let mut free = 0;
@@ -72,6 +73,7 @@ where
         Ok(SwapStats { total, used, free })
     }
 
+    #[tracing::instrument(level = "debug", skip_all)]
     async fn ram(&self) -> anyhow::Result<RamStats> {
         let mut total = 0;
         let mut free = 0;

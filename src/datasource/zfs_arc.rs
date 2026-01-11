@@ -21,6 +21,7 @@ impl<R> DataSource for KstatZfs<R>
 where
     R: Reader,
 {
+    #[tracing::instrument(level = "debug", skip_all)]
     async fn arc_stats(&self) -> anyhow::Result<ArcStats> {
         let content = self.reader.read_to_string(PATH_ARCSTATS).await?;
         let timestamp = Instant::now();

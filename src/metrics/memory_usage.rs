@@ -195,6 +195,7 @@ impl<T> Collector for MemoryUsageCollector<T>
 where
     T: DataSource + Send + Sync + 'static,
 {
+    #[tracing::instrument(level = "debug", skip_all)]
     async fn collect(&self) -> anyhow::Result<()> {
         if let Some(swap_metrics) = &self.swap_metrics {
             let stats = self.data_source.swap().await?;

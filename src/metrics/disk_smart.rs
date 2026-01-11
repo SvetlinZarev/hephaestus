@@ -432,6 +432,7 @@ impl<T> Collector for SmartCollector<T>
 where
     T: DataSource + Send + Sync + 'static,
 {
+    #[tracing::instrument(level = "debug", skip_all)]
     async fn collect(&self) -> anyhow::Result<()> {
         let stats = self.data_source.disk_temps().await?;
         let guard = self.measurements.lock().unwrap_or_else(|e| e.into_inner());

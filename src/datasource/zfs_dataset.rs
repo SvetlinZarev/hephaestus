@@ -57,6 +57,7 @@ impl<R> DataSource for KstatZfsDatasetIo<R>
 where
     R: Reader,
 {
+    #[tracing::instrument(level = "debug", skip_all)]
     async fn dataset_io(&self) -> anyhow::Result<ZfsIoStats> {
         let mut datasets = Vec::new();
 

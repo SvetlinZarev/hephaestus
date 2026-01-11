@@ -168,6 +168,7 @@ impl<T> Collector for CpuUsageCollector<T>
 where
     T: DataSource + Send + Sync + 'static,
 {
+    #[tracing::instrument(level = "debug", skip_all)]
     async fn collect(&self) -> anyhow::Result<()> {
         let stats = self.data_source.cpu_usage().await?;
 

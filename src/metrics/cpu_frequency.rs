@@ -98,6 +98,7 @@ impl<T> Collector for CpuFrequencyCollector<T>
 where
     T: DataSource + Send + Sync + 'static,
 {
+    #[tracing::instrument(level = "debug", skip_all)]
     async fn collect(&self) -> anyhow::Result<()> {
         let stats = self.data_source.cpu_freq().await?;
         for (core, &freq) in stats.cores.iter().enumerate() {

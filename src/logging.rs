@@ -63,7 +63,7 @@ where
             .with_target(true)
             .with_line_number(true)
             .with_level(true)
-            .with_span_events(FmtSpan::NONE)
+            .with_span_events(FmtSpan::CLOSE)
             .compact()
             .boxed(),
     )
@@ -112,7 +112,7 @@ where
                 .with_target(true)
                 .with_line_number(true)
                 .with_level(true)
-                .with_span_events(FmtSpan::NONE)
+                .with_span_events(FmtSpan::CLOSE)
                 .compact()
                 .boxed();
 

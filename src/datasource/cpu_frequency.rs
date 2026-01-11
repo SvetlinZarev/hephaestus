@@ -18,6 +18,7 @@ impl<R> DataSource for CpuFrequency<R>
 where
     R: Reader,
 {
+    #[tracing::instrument(level = "debug", skip_all)]
     async fn cpu_freq(&self) -> anyhow::Result<CpuFreqStats> {
         let mut core_freq = Vec::new();
 

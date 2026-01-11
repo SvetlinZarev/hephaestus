@@ -272,6 +272,7 @@ impl<T> Collector for UpsCollector<T>
 where
     T: DataSource + Send + Sync + 'static,
 {
+    #[tracing::instrument(level = "debug", skip_all)]
     async fn collect(&self) -> anyhow::Result<()> {
         let stats = self.data_source.ups_stats().await?;
         let guard = self.measurements.lock().unwrap_or_else(|e| e.into_inner());

@@ -204,6 +204,7 @@ impl<T> Collector for NetworkIoCollector<T>
 where
     T: DataSource + Send + Sync + 'static,
 {
+    #[tracing::instrument(level = "debug", skip_all)]
     async fn collect(&self) -> anyhow::Result<()> {
         let mut stats = self.data_source.network_io().await?;
         stats

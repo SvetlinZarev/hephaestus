@@ -21,6 +21,7 @@ impl<R> DataSource for NetworkIo<R>
 where
     R: Reader,
 {
+    #[tracing::instrument(level = "debug", skip_all)]
     async fn network_io(&self) -> anyhow::Result<NetworkIoStats> {
         let content = self.reader.read_to_string(PATH_NET_DEV).await?;
         let timestamp = Instant::now();

@@ -44,6 +44,7 @@ impl<R> DataSource for CpuUsage<R>
 where
     R: Reader,
 {
+    #[tracing::instrument(level = "debug", skip_all)]
     async fn cpu_usage(&self) -> anyhow::Result<CpuUsageStats> {
         let Ok(mut previous) = self.measurement.lock().map(|x| x.clone()) else {
             return Err(anyhow::anyhow!(

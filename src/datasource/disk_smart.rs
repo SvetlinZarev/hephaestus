@@ -19,6 +19,7 @@ impl SmartCtl {
         Self {}
     }
 
+    #[tracing::instrument(level = "trace", skip_all)]
     async fn scan_devices(&self) -> anyhow::Result<Vec<String>> {
         let output = Command::new("smartctl")
             .args(["--scan", "--json"])
@@ -39,6 +40,7 @@ impl SmartCtl {
         Ok(paths)
     }
 
+    #[tracing::instrument(level = "trace", skip_all)]
     async fn query_device(&self, path: &str) -> anyhow::Result<Option<DeviceReport>> {
         let output = Command::new("smartctl")
             .args(["-a", "--json", "--nocheck", "standby", path])
@@ -78,6 +80,7 @@ impl SmartCtl {
         Ok(Some(report))
     }
 
+    #[tracing::instrument(level = "trace", skip_all)]
     fn parse_nvme(&self, info: Device, json: &Value) -> NvmeDevice {
         let health = &json["nvme_smart_health_information_log"];
 
@@ -96,6 +99,7 @@ impl SmartCtl {
         }
     }
 
+    #[tracing::instrument(level = "trace", skip_all)]
     fn parse_sata(&self, info: Device, json: &Value) -> SataDevice {
         let mut device = SataDevice::new(info);
 
@@ -144,6 +148,7 @@ impl SmartCtl {
 }
 
 impl DataSource for SmartCtl {
+    #[tracing::instrument(level = "debug", skip_all)]
     async fn disk_temps(&self) -> anyhow::Result<SmartReports> {
         let device_paths = self.scan_devices().await?;
 

@@ -29,6 +29,7 @@ impl DockerClient {
 }
 
 impl DataSource for DockerClient {
+    #[tracing::instrument(level = "debug", skip_all)]
     async fn docker_stats(&self) -> anyhow::Result<DockerStats> {
         let docker = bollard::Docker::connect_with_unix_defaults()
             .context("Is the docker daemon running?")?;

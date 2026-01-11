@@ -38,6 +38,7 @@ impl Nut {
         Ok(Self { addr })
     }
 
+    #[tracing::instrument(level = "trace", skip_all)]
     async fn list_ups_devices(
         &self,
         reader: &mut BufReader<ReadHalf<'_>>,
@@ -70,6 +71,7 @@ impl Nut {
         Ok(names)
     }
 
+    #[tracing::instrument(level = "trace", skip_all)]
     async fn list_device_parameters(
         &self,
         reader: &mut BufReader<ReadHalf<'_>>,
@@ -106,6 +108,7 @@ impl Nut {
         Ok(params)
     }
 
+    #[tracing::instrument(level = "trace", skip_all)]
     fn collect_device_parameters(
         &self,
         device_name: String,
@@ -158,6 +161,7 @@ impl Nut {
 }
 
 impl DataSource for Nut {
+    #[tracing::instrument(level = "debug", skip_all)]
     async fn ups_stats(&self) -> anyhow::Result<UpsStats> {
         let mut stream = TcpStream::connect(&self.addr)
             .await
