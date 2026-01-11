@@ -2,7 +2,9 @@ use crate::metrics::docker::{ContainerStats, DataSource, DockerStats};
 use anyhow::Context;
 use std::collections::HashMap;
 
-use bollard::models::{ContainerCpuStats, ContainerMemoryStats, ContainerSummary};
+use bollard::models::{
+    ContainerCpuStats, ContainerMemoryStats, ContainerNetworkStats, ContainerSummary,
+};
 use bollard::query_parameters::{ListContainersOptionsBuilder, StatsOptionsBuilder};
 use futures::StreamExt;
 use tokio::sync::Mutex;
@@ -62,24 +64,20 @@ impl DataSource for DockerClient {
                 let container_cpu_stats = s.cpu_stats.as_ref();
                 let (cpu_usage, measurement) =
                     cpu_usage(&name, container_cpu_stats, &prev_cpu_stats);
+
                 if let Some(measurement) = measurement {
                     current_cpu_stats.insert(name.clone(), measurement);
                 }
 
                 let mem_usage_bytes = calculate_memory_usage(s.memory_stats.as_ref());
-
-                let (mut rx, mut tx) = (None, None);
-                if let Some(net) = s.networks.as_ref() {
-                    rx = Some(net.values().map(|n| n.rx_bytes.unwrap_or_default()).sum());
-                    tx = Some(net.values().map(|n| n.tx_bytes.unwrap_or_default()).sum());
-                }
+                let (net_rx_bytes, net_tx_bytes) = calculate_network_usage(s.networks.as_ref());
 
                 container_stats.push(ContainerStats {
                     name,
                     cpu_usage,
                     mem_usage_bytes,
-                    net_rx_bytes: rx,
-                    net_tx_bytes: tx,
+                    net_rx_bytes,
+                    net_tx_bytes,
                 });
             }
         }
@@ -163,4 +161,24 @@ fn calculate_memory_usage(stats: Option<&ContainerMemoryStats>) -> Option<u64> {
     let inactive_file = mem_stats.get("inactive_file").copied().unwrap_or(0);
 
     Some(usage.saturating_sub(inactive_file))
+}
+
+fn calculate_network_usage(
+    networks: Option<&HashMap<String, ContainerNetworkStats>>,
+) -> (Option<u64>, Option<u64>) {
+    let Some(net_map) = networks else {
+        return (None, None);
+    };
+
+    let rx = net_map
+        .values()
+        .map(|n| n.rx_bytes.unwrap_or_default())
+        .sum();
+
+    let tx = net_map
+        .values()
+        .map(|n| n.tx_bytes.unwrap_or_default())
+        .sum();
+
+    (Some(rx), Some(tx))
 }
