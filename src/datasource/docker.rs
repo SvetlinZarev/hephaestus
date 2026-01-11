@@ -119,6 +119,11 @@ fn cpu_usage(
         return (None, Some(current));
     };
 
+    if current.total <= previous.total || current.system <= previous.system {
+        // most probably, the container has been restarted
+        return (None, Some(current));
+    }
+
     let cpus = container_stats.online_cpus.unwrap_or(1) as f64;
     let cpu_delta = (current.total - previous.total) as f64;
     let sys_delta = (current.system - previous.system) as f64;
@@ -126,6 +131,10 @@ fn cpu_usage(
     let mut usage = 0.0;
     if sys_delta > 0.0 && cpu_delta > 0.0 {
         usage = (cpu_delta / sys_delta) * cpus;
+    }
+
+    if usage > cpus {
+        return (None, Some(current));
     }
 
     (Some(usage), Some(current))
