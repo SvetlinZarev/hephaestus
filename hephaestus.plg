@@ -2,7 +2,7 @@
 <!DOCTYPE PLUGIN [
   <!ENTITY name      "hephaestus">
   <!ENTITY author    "SvetlinZarev">
-  <!ENTITY version   "2026.01.10">
+  <!ENTITY version   "2026.01.11">
   <!ENTITY pluginURL "https://raw.githubusercontent.com/&author;/hephaestus/main/&name;.plg">
   <!ENTITY binaryURL "https://github.com/&author;/hephaestus/releases/latest/download/hephaestus_linux_amd64">
   <!ENTITY pluginDir "/boot/config/plugins/&name;">
@@ -37,7 +37,7 @@
 
 <FILE Name="&pluginDir;/&name;">
 <URL>&binaryURL;</URL>
-<MD5>ba87df080acde7035eddb8199203e811</MD5>
+<MD5>a272f5455364c612522fa9951480bb15</MD5>
 </FILE>
 
 <FILE Name="/etc/rc.d/rc.&name;" Mode="0755">
