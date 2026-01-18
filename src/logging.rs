@@ -71,8 +71,11 @@ where
         return None;
     }
 
-    let (non_blocking, guard) = tracing_appender::non_blocking(std::io::stdout());
-    Some((common_layer(non_blocking), guard))
+    let (non_blocking, guard) = tracing_appender::non_blocking::NonBlockingBuilder::default()
+        .lossy(false)
+        .finish(std::io::stdout());
+
+    Some((common_layer(non_blocking, true), guard))
 }
 
 #[allow(clippy::type_complexity)]
@@ -107,26 +110,28 @@ where
                     )
                 })?;
 
-            let (non_blocking, guard) = tracing_appender::non_blocking(file_appender);
-            let layer = common_layer(non_blocking);
+            let (non_blocking, guard) =
+                tracing_appender::non_blocking::NonBlockingBuilder::default()
+                    .lossy(false)
+                    .finish(file_appender);
 
+            let layer = common_layer(non_blocking, false);
             Ok(Some((layer, guard)))
         }
     }
 }
 
-fn common_layer<S, W>(w: W) -> Box<dyn Layer<S> + Send + Sync>
+fn common_layer<S, W>(w: W, ansi: bool) -> Box<dyn Layer<S> + Send + Sync>
 where
     S: Subscriber + for<'a> registry::LookupSpan<'a>,
     W: for<'writer> MakeWriter<'writer> + Send + Sync + 'static,
 {
     fmt::layer()
         .with_writer(w)
-        .with_ansi(true)
+        .with_ansi(ansi)
         .with_target(true)
         .with_line_number(true)
         .with_level(true)
         .with_span_events(FmtSpan::CLOSE)
-        .compact()
         .boxed()
 }
