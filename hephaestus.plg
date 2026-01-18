@@ -50,7 +50,7 @@ case "$1" in
   'start')
     if [ -x "/usr/local/sbin/&name;" ]; then
       echo "Starting &name;..."
-      nohup /usr/local/sbin/&name; &pluginDir;/config.toml > &logDir;/stdout.log 2> &logDir;/stderr.log &amp;
+      nohup nice -n 10 /usr/local/sbin/&name; &pluginDir;/config.toml > &logDir;/stdout.log 2> &logDir;/stderr.log &amp;
     else
       echo "Error: &name; binary not found or not executable in /usr/local/sbin/"
     fi
