@@ -1,7 +1,7 @@
 use num_traits::ToPrimitive;
 use prometheus::core::Desc;
 use prometheus::proto::{LabelPair, MetricFamily, MetricType};
-use std::sync::MutexGuard;
+use std::sync::Mutex;
 
 pub fn into_labels(kv: &[(&str, &str)]) -> Vec<LabelPair> {
     kv.iter()
@@ -80,10 +80,20 @@ pub fn counter(desc: &Desc, label_values: Vec<LabelPair>, value: f64) -> MetricF
 }
 
 pub fn update_measurement_if<T>(
-    mut guard: MutexGuard<Option<T>>,
-    value: T,
+    target: &Mutex<Option<T>>,
+    value: Option<T>,
     predicate: impl Fn(&T, &T) -> bool,
 ) {
+    let mut guard = target.lock().unwrap_or_else(|e| e.into_inner());
+
+    // If a metric collector has failed, we want to
+    // stop exposing that metric instead of reporting
+    // the previous, stale value
+    let Some(value) = value else {
+        *guard = None;
+        return;
+    };
+
     match guard.as_ref() {
         None => *guard = Some(value),
         Some(prev) => {

@@ -213,13 +213,22 @@ where
 {
     #[tracing::instrument(level = "debug", skip_all)]
     async fn collect(&self) -> anyhow::Result<()> {
-        let mut stats = self.data_source.disk_io().await?;
-        stats
-            .disks
-            .retain(|disk| self.should_collect(&disk.device_name));
+        let stats = self
+            .data_source
+            .disk_io()
+            .await
+            .map(|mut stats| {
+                stats
+                    .disks
+                    .retain(|disk| self.should_collect(&disk.device_name));
+                stats
+            })
+            .inspect_err(|err| tracing::error!(error=?err, "Failed to collect disk IO statistics"))
+            .ok();
 
-        let guard = self.measurement.lock().unwrap_or_else(|e| e.into_inner());
-        update_measurement_if(guard, stats, |old, new| old.timestamp < new.timestamp);
+        update_measurement_if(&self.measurement, stats, |old, new| {
+            old.timestamp < new.timestamp
+        });
 
         Ok(())
     }

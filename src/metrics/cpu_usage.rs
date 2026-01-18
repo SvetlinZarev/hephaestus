@@ -175,7 +175,6 @@ where
         self.metrics.total_usage.set(stats.total_usage);
         self.update_gauge(&self.metrics.total_breakdown, &stats.total_breakdown, None);
 
-        // 2. Set per- stats
         for core_stat in stats.cores {
             let core_label = core_stat.core.to_string();
 
