@@ -407,7 +407,7 @@ where
 }
 
 struct SmartCollector<T> {
-    measurements: Arc<Mutex<Option<SmartReports>>>,
+    measurement: Arc<Mutex<Option<SmartReports>>>,
     data_source: T,
 }
 
@@ -418,12 +418,12 @@ where
     fn new(data_source: T) -> Self {
         Self {
             data_source,
-            measurements: Arc::new(Mutex::new(None)),
+            measurement: Arc::new(Mutex::new(None)),
         }
     }
 
     fn measurements(&self) -> Arc<Mutex<Option<SmartReports>>> {
-        self.measurements.clone()
+        self.measurement.clone()
     }
 }
 
@@ -434,9 +434,16 @@ where
 {
     #[tracing::instrument(level = "debug", skip_all)]
     async fn collect(&self) -> anyhow::Result<()> {
-        let stats = self.data_source.disk_temps().await?;
-        let guard = self.measurements.lock().unwrap_or_else(|e| e.into_inner());
-        update_measurement_if(guard, stats, |old, new| old.timestamp < new.timestamp);
+        let stats = self
+            .data_source
+            .disk_temps()
+            .await
+            .inspect_err(|e| tracing::error!(error=?e, "Failed to collect disk SMART statistics"))
+            .ok();
+
+        update_measurement_if(&self.measurement, stats, |old, new| {
+            old.timestamp < new.timestamp
+        });
 
         Ok(())
     }

@@ -179,10 +179,16 @@ where
 {
     #[tracing::instrument(level = "debug", skip_all)]
     async fn collect(&self) -> anyhow::Result<()> {
-        let stats = self.data_source.docker_stats().await?;
+        let stats = self
+            .data_source
+            .docker_stats()
+            .await
+            .inspect_err(|e| tracing::error!(error=?e, "Failed to collect docker statistics"))
+            .ok();
 
-        let guard = self.measurement.lock().unwrap_or_else(|e| e.into_inner());
-        update_measurement_if(guard, stats, |old, new| old.timestamp < new.timestamp);
+        update_measurement_if(&self.measurement, stats, |old, new| {
+            old.timestamp < new.timestamp
+        });
 
         Ok(())
     }

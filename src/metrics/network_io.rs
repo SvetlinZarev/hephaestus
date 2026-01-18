@@ -206,13 +206,22 @@ where
 {
     #[tracing::instrument(level = "debug", skip_all)]
     async fn collect(&self) -> anyhow::Result<()> {
-        let mut stats = self.data_source.network_io().await?;
-        stats
-            .interfaces
-            .retain(|iface| self.should_collect(iface.interface.as_str()));
+        let stats = self
+            .data_source
+            .network_io()
+            .await
+            .map(|mut stats| {
+                stats
+                    .interfaces
+                    .retain(|iface| self.should_collect(iface.interface.as_str()));
+                stats
+            })
+            .inspect_err(|e| tracing::error!(error=?e, "Failed to collect network IO statistics"))
+            .ok();
 
-        let guard = self.measurement.lock().unwrap_or_else(|e| e.into_inner());
-        update_measurement_if(guard, stats, |old, new| old.timestamp < new.timestamp);
+        update_measurement_if(&self.measurement, stats, |old, new| {
+            old.timestamp < new.timestamp
+        });
 
         Ok(())
     }
