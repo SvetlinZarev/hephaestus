@@ -176,6 +176,8 @@ impl prometheus::core::Collector for Metrics {
             &self.battery_level,
             &self.input_voltage,
             &self.output_voltage,
+            &self.nominal_apparent_power,
+            &self.nominal_real_power,
             &self.apparent_power,
             &self.real_power,
             &self.load,
