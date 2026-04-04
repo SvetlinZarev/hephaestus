@@ -25,12 +25,9 @@ impl Configuration {
         let cfg = Config::builder()
             .add_source(config::File::from_str(&defaults, config::FileFormat::Json))
             .add_source(
-                config::File::with_name(config_path.join("config.toml").to_string_lossy().as_ref())
+                config::File::with_name(config_path.to_string_lossy().as_ref())
                     .format(config::FileFormat::Toml)
                     .required(false),
-            )
-            .add_source(
-                config::File::with_name(config_path.to_string_lossy().as_ref()).required(false),
             )
             .add_source(config::Environment::with_prefix("CFG").separator("__"))
             .build()?;
@@ -106,7 +103,7 @@ where
 {
     const ARG_CONFIG: &str = "--config";
     const ARG_CONFIG_EQ: &str = "--config=";
-    const CURRENT_DIRECTORY: &str = "./";
+    const DEFAULT_CONFIG: &str = "./config.toml";
 
     let mut iter = args.into_iter();
     while let Some(arg) = iter.next() {
@@ -120,7 +117,7 @@ where
                 .filter(|v| !v.is_empty())
                 .filter(|v| !v.starts_with("-"))
                 .ok_or_else(|| {
-                    anyhow::anyhow!("Expected configuration path after {}", ARG_CONFIG)
+                    anyhow::anyhow!("Expected configuration file path after {}", ARG_CONFIG)
                 })?;
 
             return Ok(path.to_owned());
@@ -131,7 +128,7 @@ where
 
             if path.is_empty() {
                 return Err(anyhow::anyhow!(
-                    "Expected configuration path for parameter {}",
+                    "Expected configuration file path for parameter {}",
                     ARG_CONFIG_EQ
                 ));
             }
@@ -140,7 +137,7 @@ where
         }
     }
 
-    Ok(CURRENT_DIRECTORY.to_owned())
+    Ok(DEFAULT_CONFIG.to_owned())
 }
 
 pub fn should_print_config_and_exit<I, S>(args: I) -> bool
@@ -186,7 +183,7 @@ mod tests {
     fn test_get_config_base_path() {
         // (input args, expected result, is_error)
         let cases = [
-            (vec!["app"], "./", false),
+            (vec!["app"], "./config.toml", false),
             (vec!["app", "--config", "/tmp/config"], "/tmp/config", false),
             (vec!["app", "--foo", "--config", "path"], "path", false),
             (vec!["app", "--config", "--print-config"], "", true),
