@@ -1,5 +1,5 @@
 use crate::datasource::Reader;
-use crate::metrics::zfs_dataset::{DataSource, DatasetIoStats, ZfsIoStats};
+use crate::metrics::zfs_dataset::{DataSource, DatasetIoStats, ZfsDatasetStats};
 use tokio::fs;
 
 const KSTAT_ZFS: &str = "/proc/spl/kstat/zfs";
@@ -58,7 +58,7 @@ where
     R: Reader,
 {
     #[tracing::instrument(level = "debug", skip_all)]
-    async fn dataset_io(&self) -> anyhow::Result<ZfsIoStats> {
+    async fn zfs_dataset(&self) -> anyhow::Result<ZfsDatasetStats> {
         let mut datasets = Vec::new();
 
         let mut pool_entries = fs::read_dir(KSTAT_ZFS).await?;
@@ -86,7 +86,7 @@ where
             }
         }
 
-        Ok(ZfsIoStats {
+        Ok(ZfsDatasetStats {
             timestamp: tokio::time::Instant::now(),
             datasets,
         })

@@ -1,4 +1,4 @@
-use crate::metrics::disk_smart::{DataSource, Device, NvmeDevice, SataDevice, SmartReports};
+use crate::metrics::disk_smart::{DataSource, Device, DiskSmartStats, NvmeDevice, SataDevice};
 use futures::StreamExt;
 use futures::stream::FuturesUnordered;
 use serde_json::Value;
@@ -149,7 +149,7 @@ impl SmartCtl {
 
 impl DataSource for SmartCtl {
     #[tracing::instrument(level = "debug", skip_all)]
-    async fn disk_temps(&self) -> anyhow::Result<SmartReports> {
+    async fn disk_smart(&self) -> anyhow::Result<DiskSmartStats> {
         let device_paths = self.scan_devices().await?;
 
         let mut tasks = FuturesUnordered::new();
@@ -173,7 +173,7 @@ impl DataSource for SmartCtl {
             }
         }
 
-        Ok(SmartReports {
+        Ok(DiskSmartStats {
             timestamp: Instant::now(),
             sata,
             nvme,

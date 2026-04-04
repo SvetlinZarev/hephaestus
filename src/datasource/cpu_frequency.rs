@@ -1,5 +1,5 @@
 use crate::datasource::Reader;
-use crate::metrics::cpu_frequency::{CpuFreqStats, DataSource};
+use crate::metrics::cpu_frequency::{CpuFrequencyStats, DataSource};
 
 pub struct CpuFrequency<R> {
     reader: R,
@@ -19,7 +19,7 @@ where
     R: Reader,
 {
     #[tracing::instrument(level = "debug", skip_all)]
-    async fn cpu_freq(&self) -> anyhow::Result<CpuFreqStats> {
+    async fn cpu_frequency(&self) -> anyhow::Result<CpuFrequencyStats> {
         let mut core_freq = Vec::new();
 
         for core in 0..256 {
@@ -50,7 +50,7 @@ where
             return Err(anyhow::anyhow!("No CPU frequency sensors found"));
         }
 
-        Ok(CpuFreqStats { cores: core_freq })
+        Ok(CpuFrequencyStats { cores: core_freq })
     }
 }
 
@@ -69,7 +69,7 @@ mod tests {
         reader.add_response(cpu_freq_path(3), format!("{}", 5100362));
 
         let ds = CpuFrequency::new(reader);
-        let stats = ds.cpu_freq().await.unwrap();
+        let stats = ds.cpu_frequency().await.unwrap();
 
         assert_eq!(4, stats.cores.len());
         assert_eq!(1000 * 1100980, stats.cores[0]);

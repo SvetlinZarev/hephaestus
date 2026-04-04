@@ -20,7 +20,7 @@ impl Default for Config {
 }
 
 #[derive(Debug, Clone)]
-pub struct SmartReports {
+pub struct DiskSmartStats {
     pub timestamp: Instant,
     pub sata: Vec<SataDevice>,
     pub nvme: Vec<NvmeDevice>,
@@ -104,12 +104,12 @@ pub struct Device {
 }
 
 pub trait DataSource {
-    fn disk_temps(&self) -> impl Future<Output = anyhow::Result<SmartReports>> + Send;
+    fn disk_smart(&self) -> impl Future<Output = anyhow::Result<DiskSmartStats>> + Send;
 }
 
 #[derive(Clone)]
 struct Metrics {
-    state: Measurement<SmartReports>,
+    state: Measurement<DiskSmartStats>,
 
     sata_temp: Desc,
     sata_temp_min: Desc,
@@ -137,7 +137,7 @@ struct Metrics {
 }
 
 impl Metrics {
-    fn new(state: Measurement<SmartReports>) -> anyhow::Result<Self> {
+    fn new(state: Measurement<DiskSmartStats>) -> anyhow::Result<Self> {
         let labels = vec!["device".into(), "model".into(), "serial_number".into()];
 
         Ok(Self {
@@ -389,19 +389,19 @@ where
             return Ok(Box::new(NoOpCollector::new()));
         }
 
-        let collector = SmartCollector::new(self.data_source);
+        let collector = DiskSmartCollector::new(self.data_source);
         registry.register(Box::new(collector.metrics()?))?;
 
         Ok(Box::new(collector))
     }
 }
 
-struct SmartCollector<T> {
-    measurement: Measurement<SmartReports>,
+struct DiskSmartCollector<T> {
+    measurement: Measurement<DiskSmartStats>,
     data_source: T,
 }
 
-impl<T> SmartCollector<T>
+impl<T> DiskSmartCollector<T>
 where
     T: DataSource + Send + Sync + 'static,
 {
@@ -418,7 +418,7 @@ where
 }
 
 #[async_trait::async_trait]
-impl<T> Collector for SmartCollector<T>
+impl<T> Collector for DiskSmartCollector<T>
 where
     T: DataSource + Send + Sync + 'static,
 {
@@ -426,7 +426,7 @@ where
     async fn collect(&self) -> anyhow::Result<()> {
         let stats = self
             .data_source
-            .disk_temps()
+            .disk_smart()
             .await
             .inspect_err(|e| tracing::error!(error=?e, "Failed to collect disk SMART statistics"))
             .ok();
