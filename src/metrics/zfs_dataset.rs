@@ -48,7 +48,7 @@ struct Metrics {
 }
 
 impl Metrics {
-    pub fn new(state: Measurement<ZfsIoStats>) -> anyhow::Result<Self> {
+    fn new(state: Measurement<ZfsIoStats>) -> anyhow::Result<Self> {
         let labels = vec!["pool".to_owned(), "dataset".to_owned()];
 
         Ok(Self {
