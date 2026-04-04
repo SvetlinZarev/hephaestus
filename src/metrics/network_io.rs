@@ -150,9 +150,7 @@ where
         }
 
         let collector = NetworkIoCollector::new(self.config, self.data_source);
-
-        let metrics = Metrics::new(collector.measurement.clone())?;
-        registry.register(Box::new(metrics))?;
+        registry.register(Box::new(collector.metrics()?))?;
 
         Ok(Box::new(collector))
     }
@@ -171,6 +169,10 @@ impl<T> NetworkIoCollector<T> {
             data_source,
             measurement: Measurement::new(),
         }
+    }
+
+    fn metrics(&self) -> anyhow::Result<Metrics> {
+        Metrics::new(self.measurement.clone())
     }
 
     fn should_collect(&self, interface_name: &str) -> bool {

@@ -238,9 +238,7 @@ where
         }
 
         let collector = UpsCollector::new(self.data_source);
-
-        let metrics = Metrics::new(collector.measurement.clone())?;
-        registry.register(Box::new(metrics))?;
+        registry.register(Box::new(collector.metrics()?))?;
 
         Ok(Box::new(collector))
     }
@@ -255,11 +253,15 @@ impl<T> UpsCollector<T>
 where
     T: DataSource + Send + Sync + 'static,
 {
-    pub fn new(data_source: T) -> Self {
+    fn new(data_source: T) -> Self {
         Self {
             data_source,
             measurement: Measurement::new(),
         }
+    }
+
+    fn metrics(&self) -> anyhow::Result<Metrics> {
+        Metrics::new(self.measurement.clone())
     }
 }
 
