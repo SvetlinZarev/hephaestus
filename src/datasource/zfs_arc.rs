@@ -1,5 +1,5 @@
 use crate::datasource::Reader;
-use crate::metrics::zfs_arc::{ArcStats, DataSource};
+use crate::metrics::zfs_arc::{DataSource, ZfsArcStats};
 use tokio::time::Instant;
 
 const PATH_ARCSTATS: &str = "/proc/spl/kstat/zfs/arcstats";
@@ -22,10 +22,10 @@ where
     R: Reader,
 {
     #[tracing::instrument(level = "debug", skip_all)]
-    async fn arc_stats(&self) -> anyhow::Result<ArcStats> {
+    async fn zfs_arc(&self) -> anyhow::Result<ZfsArcStats> {
         let content = self.reader.read_to_string(PATH_ARCSTATS).await?;
         let timestamp = Instant::now();
-        let mut stats = ArcStats {
+        let mut stats = ZfsArcStats {
             timestamp,
             hits: 0,
             misses: 0,
@@ -90,7 +90,7 @@ mod tests {
         reader.add_response(PATH_ARCSTATS, content);
 
         let data_source = KstatZfs::new(reader);
-        let stats = data_source.arc_stats().await?;
+        let stats = data_source.zfs_arc().await?;
 
         assert_eq!(stats.hits, 500);
         assert_eq!(stats.misses, 100);
@@ -109,10 +109,10 @@ mod tests {
 
         let data_source = KstatZfs::new(reader);
 
-        let stats1 = data_source.arc_stats().await?;
+        let stats1 = data_source.zfs_arc().await?;
         assert_eq!(stats1.hits, 10);
 
-        let stats2 = data_source.arc_stats().await?;
+        let stats2 = data_source.zfs_arc().await?;
         assert_eq!(stats2.hits, 20);
 
         Ok(())
@@ -123,7 +123,7 @@ mod tests {
         let reader = HardcodedReader::new(); // No response added
         let data_source = KstatZfs::new(reader);
 
-        let result = data_source.arc_stats().await;
+        let result = data_source.zfs_arc().await;
 
         assert!(result.is_err());
         let err_msg = result.unwrap_err().to_string();
@@ -137,7 +137,7 @@ mod tests {
         reader.add_response(PATH_ARCSTATS, malformed);
 
         let data_source = KstatZfs::new(reader);
-        let stats = data_source.arc_stats().await?;
+        let stats = data_source.zfs_arc().await?;
 
         assert_eq!(stats.hits, 0);
         assert_eq!(stats.misses, 50);

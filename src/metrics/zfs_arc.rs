@@ -20,7 +20,7 @@ impl Default for Config {
 }
 
 #[derive(Debug, Clone)]
-pub struct ArcStats {
+pub struct ZfsArcStats {
     pub timestamp: Instant,
     pub hits: u64,
     pub misses: u64,
@@ -30,12 +30,12 @@ pub struct ArcStats {
 }
 
 pub trait DataSource {
-    fn arc_stats(&self) -> impl Future<Output = anyhow::Result<ArcStats>> + Send;
+    fn zfs_arc(&self) -> impl Future<Output = anyhow::Result<ZfsArcStats>> + Send;
 }
 
 #[derive(Clone)]
 struct Metrics {
-    state: Measurement<ArcStats>,
+    state: Measurement<ZfsArcStats>,
     hits: Desc,
     misses: Desc,
     size: Desc,
@@ -44,7 +44,7 @@ struct Metrics {
 }
 
 impl Metrics {
-    fn new(state: Measurement<ArcStats>) -> anyhow::Result<Self> {
+    fn new(state: Measurement<ZfsArcStats>) -> anyhow::Result<Self> {
         let labels = HashMap::new();
 
         Ok(Self {
@@ -109,19 +109,19 @@ where
             return Ok(Box::new(NoOpCollector::new()));
         }
 
-        let collector = ZfsCollector::new(self.data_source);
+        let collector = ZfsArcCollector::new(self.data_source);
         registry.register(Box::new(collector.metrics()?))?;
 
         Ok(Box::new(collector))
     }
 }
 
-struct ZfsCollector<T> {
-    measurement: Measurement<ArcStats>,
+struct ZfsArcCollector<T> {
+    measurement: Measurement<ZfsArcStats>,
     data_source: T,
 }
 
-impl<T> ZfsCollector<T>
+impl<T> ZfsArcCollector<T>
 where
     T: DataSource,
 {
@@ -138,7 +138,7 @@ where
 }
 
 #[async_trait::async_trait]
-impl<T> Collector for ZfsCollector<T>
+impl<T> Collector for ZfsArcCollector<T>
 where
     T: DataSource + Send + Sync + 'static,
 {
@@ -146,7 +146,7 @@ where
     async fn collect(&self) -> anyhow::Result<()> {
         let stats = self
             .data_source
-            .arc_stats()
+            .zfs_arc()
             .await
             .inspect_err(|e| tracing::error!(error=?e, "Failed to collect ZFS ARC statistics"))
             .ok();

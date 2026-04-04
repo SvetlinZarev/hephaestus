@@ -37,9 +37,9 @@ pub fn init_collectors(
     collectors.push(disk_io.register(registry)?);
 
     let data_source = datasource::disk_smart::SmartCtl::new();
-    let disk_temp =
-        metrics::disk_smart::Smart::new(config.collector.disk_temp.clone(), data_source);
-    collectors.push(disk_temp.register(registry)?);
+    let disk_smart =
+        metrics::disk_smart::Smart::new(config.collector.disk_smart.clone(), data_source);
+    collectors.push(disk_smart.register(registry)?);
 
     let data_source = datasource::nut::Nut::new(config.datasource.nut.clone())?;
     let ups = metrics::ups::Ups::new(config.collector.ups.clone(), data_source);

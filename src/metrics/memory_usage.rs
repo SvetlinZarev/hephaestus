@@ -26,7 +26,7 @@ pub struct SwapStats {
 }
 
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
-pub struct RamStats {
+pub struct MemoryStats {
     pub total: u64,
     pub used: u64,
     pub free: u64,
@@ -37,7 +37,7 @@ pub struct RamStats {
 
 pub trait DataSource {
     fn swap(&self) -> impl Future<Output = anyhow::Result<SwapStats>> + Send;
-    fn ram(&self) -> impl Future<Output = anyhow::Result<RamStats>> + Send;
+    fn memory(&self) -> impl Future<Output = anyhow::Result<MemoryStats>> + Send;
 }
 
 #[derive(Debug, Clone)]
@@ -204,7 +204,7 @@ where
             swap_metrics.total.set(stats.total as i64);
         }
 
-        let stats = self.data_source.ram().await?;
+        let stats = self.data_source.memory().await?;
         self.ram_metrics.free.set(stats.free as i64);
         self.ram_metrics.used.set(stats.used as i64);
         self.ram_metrics.total.set(stats.total as i64);

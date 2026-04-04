@@ -15,12 +15,12 @@ impl Default for Config {
 }
 
 #[derive(Debug, Clone)]
-pub struct CpuFreqStats {
+pub struct CpuFrequencyStats {
     pub cores: Vec<u64>,
 }
 
 pub trait DataSource {
-    fn cpu_freq(&self) -> impl Future<Output = anyhow::Result<CpuFreqStats>> + Send;
+    fn cpu_frequency(&self) -> impl Future<Output = anyhow::Result<CpuFrequencyStats>> + Send;
 }
 
 #[derive(Clone)]
@@ -100,7 +100,7 @@ where
 {
     #[tracing::instrument(level = "debug", skip_all)]
     async fn collect(&self) -> anyhow::Result<()> {
-        let stats = self.data_source.cpu_freq().await?;
+        let stats = self.data_source.cpu_frequency().await?;
         for (core, &freq) in stats.cores.iter().enumerate() {
             self.metrics
                 .core_freq

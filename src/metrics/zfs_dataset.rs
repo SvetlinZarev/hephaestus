@@ -29,18 +29,18 @@ pub struct DatasetIoStats {
 }
 
 #[derive(Debug, Clone)]
-pub struct ZfsIoStats {
+pub struct ZfsDatasetStats {
     pub timestamp: time::Instant,
     pub datasets: Vec<DatasetIoStats>,
 }
 
 pub trait DataSource {
-    fn dataset_io(&self) -> impl Future<Output = anyhow::Result<ZfsIoStats>> + Send;
+    fn zfs_dataset(&self) -> impl Future<Output = anyhow::Result<ZfsDatasetStats>> + Send;
 }
 
 #[derive(Clone)]
 struct Metrics {
-    state: Measurement<ZfsIoStats>,
+    state: Measurement<ZfsDatasetStats>,
     reads: Desc,
     writes: Desc,
     nread: Desc,
@@ -48,7 +48,7 @@ struct Metrics {
 }
 
 impl Metrics {
-    fn new(state: Measurement<ZfsIoStats>) -> anyhow::Result<Self> {
+    fn new(state: Measurement<ZfsDatasetStats>) -> anyhow::Result<Self> {
         let labels = vec!["pool".to_owned(), "dataset".to_owned()];
 
         Ok(Self {
@@ -141,7 +141,7 @@ where
 }
 
 struct ZfsDatasetIoCollector<T> {
-    measurement: Measurement<ZfsIoStats>,
+    measurement: Measurement<ZfsDatasetStats>,
     data_source: T,
 }
 
@@ -170,7 +170,7 @@ where
     async fn collect(&self) -> anyhow::Result<()> {
         let stats = self
             .data_source
-            .dataset_io()
+            .zfs_dataset()
             .await
             .inspect_err(|e| tracing::error!(error=?e, "Failed to collect ZFS dataset statistics"))
             .ok();

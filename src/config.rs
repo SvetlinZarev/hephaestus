@@ -86,7 +86,7 @@ pub struct Collectors {
     pub memory_usage: memory_usage::Config,
     pub network_io: network_io::Config,
     pub disk_io: disk_io::Config,
-    pub disk_temp: disk_smart::Config,
+    pub disk_smart: disk_smart::Config,
     pub ups: ups::Config,
     pub zfs_arc: zfs_arc::Config,
     pub zfs_dataset: zfs_dataset::Config,

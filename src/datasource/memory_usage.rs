@@ -1,5 +1,5 @@
 use crate::datasource::Reader;
-use crate::metrics::memory_usage::{DataSource, RamStats, SwapStats};
+use crate::metrics::memory_usage::{DataSource, MemoryStats, SwapStats};
 
 const PATH_MEM_INFO: &str = "/proc/meminfo";
 
@@ -74,7 +74,7 @@ where
     }
 
     #[tracing::instrument(level = "debug", skip_all)]
-    async fn ram(&self) -> anyhow::Result<RamStats> {
+    async fn memory(&self) -> anyhow::Result<MemoryStats> {
         let mut total = 0;
         let mut free = 0;
         let mut available = 0;
@@ -105,7 +105,7 @@ where
             .saturating_sub(buffers)
             .saturating_sub(cache_total);
 
-        Ok(RamStats {
+        Ok(MemoryStats {
             total,
             used,
             free,
@@ -186,7 +186,10 @@ DirectMap1G:    49283072 kB
         reader.add_response(PATH_MEM_INFO, MEM_INFO);
 
         let ds = MemoryUsage::new(reader);
-        let ram = ds.ram().await.expect("Failed to read RAM usage statistics");
+        let ram = ds
+            .memory()
+            .await
+            .expect("Failed to read RAM usage statistics");
         assert_eq!(ram.total, 62_965_063_680);
         assert_eq!(ram.free, 45_488_898_048);
         assert_eq!(ram.available, 55_396_179_968);
