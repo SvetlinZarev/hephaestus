@@ -1,6 +1,6 @@
 use hephaestus::bootstrap::init_collectors;
 use hephaestus::config::{
-    Configuration, get_config_base_path, print_config, should_print_config_and_exit,
+    Configuration, get_config_path, print_config, should_print_config_and_exit,
 };
 use hephaestus::logging::setup_logging;
 use hephaestus::server::start_server;
@@ -13,7 +13,7 @@ use tokio::time::Instant;
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let configuration = Configuration::load(get_config_base_path(std::env::args())?)?;
+    let configuration = Configuration::load(get_config_path(std::env::args())?)?;
     if should_print_config_and_exit(std::env::args()) {
         print_config(&configuration)?;
         return Ok(());

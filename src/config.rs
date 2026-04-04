@@ -96,7 +96,7 @@ pub struct DataSources {
     pub nut: nut::Config,
 }
 
-pub fn get_config_base_path<I, S>(args: I) -> anyhow::Result<String>
+pub fn get_config_path<I, S>(args: I) -> anyhow::Result<String>
 where
     I: IntoIterator<Item = S>,
     S: AsRef<str>,
@@ -157,7 +157,7 @@ pub fn print_config(config: &Configuration) -> anyhow::Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use crate::config::{get_config_base_path, should_print_config_and_exit};
+    use crate::config::{get_config_path, should_print_config_and_exit};
 
     #[test]
     fn test_should_print_config_and_exit_cases() {
@@ -180,7 +180,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_config_base_path() {
+    fn test_get_config_path() {
         // (input args, expected result, is_error)
         let cases = [
             (vec!["app"], "./config.toml", false),
@@ -195,7 +195,7 @@ mod tests {
         ];
 
         for (ref args, expected, is_error) in cases {
-            let result = get_config_base_path(args);
+            let result = get_config_path(args);
 
             if is_error {
                 assert!(result.is_err(), "Expected error for args: {:?}", args);
