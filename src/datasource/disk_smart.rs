@@ -180,3 +180,179 @@ impl DataSource for SmartCtl {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::metrics::disk_smart::Device;
+    use serde_json::json;
+
+    fn test_device() -> Device {
+        Device {
+            device: "/dev/test".to_string(),
+            model: "TestModel".to_string(),
+            serial_number: "SN123".to_string(),
+        }
+    }
+
+    #[test]
+    fn test_parse_nvme_full() {
+        let smart = SmartCtl::new();
+        let json = json!({
+            "nvme_smart_health_information_log": {
+                "temperature": 35,
+                "available_spare": 95,
+                "percentage_used": 5,
+                "data_units_read": 1_000_000,
+                "data_units_written": 500_000,
+                "host_reads": 2_000_000,
+                "host_writes": 1_500_000,
+                "power_on_hours": 1000,
+                "unsafe_shutdowns": 2,
+                "media_errors": 0
+            }
+        });
+
+        let result = smart.parse_nvme(test_device(), &json);
+        assert_eq!(result.temperature, Some(35.0));
+        assert!((result.available_spare.unwrap() - 0.95).abs() < f64::EPSILON);
+        assert!((result.percent_used.unwrap() - 0.05).abs() < f64::EPSILON);
+        assert_eq!(result.data_units_read, Some(1_000_000));
+        assert_eq!(result.data_units_written, Some(500_000));
+        assert_eq!(result.host_reads, Some(2_000_000));
+        assert_eq!(result.host_writes, Some(1_500_000));
+        assert_eq!(result.power_on_hours, Some(1000));
+        assert_eq!(result.unsafe_shutdowns, Some(2));
+        assert_eq!(result.media_errors, Some(0));
+    }
+
+    #[test]
+    fn test_parse_nvme_missing_health_log() {
+        let smart = SmartCtl::new();
+        let json = json!({});
+
+        let result = smart.parse_nvme(test_device(), &json);
+        assert!(result.temperature.is_none());
+        assert!(result.available_spare.is_none());
+        assert!(result.percent_used.is_none());
+        assert!(result.data_units_read.is_none());
+        assert!(result.data_units_written.is_none());
+        assert!(result.host_reads.is_none());
+        assert!(result.host_writes.is_none());
+        assert!(result.power_on_hours.is_none());
+        assert!(result.unsafe_shutdowns.is_none());
+        assert!(result.media_errors.is_none());
+    }
+
+    #[test]
+    fn test_parse_sata_all_attributes() {
+        let smart = SmartCtl::new();
+        let json = json!({
+            "ata_smart_attributes": {
+                "table": [
+                    {"id": 4, "raw": {"value": 100}},
+                    {"id": 5, "raw": {"value": 2}},
+                    {"id": 9, "raw": {"value": 5000}},
+                    {"id": 12, "raw": {"value": 50}},
+                    {"id": 193, "raw": {"value": 300}},
+                    {"id": 197, "raw": {"value": 1}},
+                    {"id": 198, "raw": {"value": 3}},
+                    {"id": 199, "raw": {"value": 7}},
+                    {"id": 231, "raw": {"value": 95}},
+                ]
+            }
+        });
+
+        let result = smart.parse_sata(test_device(), &json);
+        assert_eq!(result.start_stop_count, Some(100));
+        assert_eq!(result.reallocated_sectors, Some(2));
+        assert_eq!(result.power_on_hours, Some(5000));
+        assert_eq!(result.power_cycle_count, Some(50));
+        assert_eq!(result.load_cycle_count, Some(300));
+        assert_eq!(result.pending_sectors, Some(1));
+        assert_eq!(result.uncorrectable_errors, Some(3));
+        assert_eq!(result.crc_errors, Some(7));
+        assert_eq!(result.wear_level, Some(95.0));
+    }
+
+    #[test]
+    fn test_parse_sata_temperature_simple() {
+        let smart = SmartCtl::new();
+        // raw_val <= 0xFFFF: only current temperature, no min/max
+        let json = json!({
+            "ata_smart_attributes": {
+                "table": [
+                    {"id": 194, "raw": {"value": 42}}
+                ]
+            }
+        });
+
+        let result = smart.parse_sata(test_device(), &json);
+        assert_eq!(result.temperature, Some(42.0));
+        assert!(result.temperature_min.is_none());
+        assert!(result.temperature_max.is_none());
+    }
+
+    #[test]
+    fn test_parse_sata_temperature_packed_min_max() {
+        let smart = SmartCtl::new();
+        // Packed format: current=35 (bits 0-7), min=20 (bits 16-23), max=55 (bits 32-39)
+        let raw: u64 = 35 | (20 << 16) | (55u64 << 32);
+        let json = json!({
+            "ata_smart_attributes": {
+                "table": [
+                    {"id": 194, "raw": {"value": raw}}
+                ]
+            }
+        });
+
+        let result = smart.parse_sata(test_device(), &json);
+        assert_eq!(result.temperature, Some(35.0));
+        assert_eq!(result.temperature_min, Some(20.0));
+        assert_eq!(result.temperature_max, Some(55.0));
+    }
+
+    #[test]
+    fn test_parse_sata_empty_attributes() {
+        let smart = SmartCtl::new();
+        let json = json!({});
+
+        let result = smart.parse_sata(test_device(), &json);
+        assert!(result.temperature.is_none());
+        assert!(result.start_stop_count.is_none());
+        assert!(result.power_on_hours.is_none());
+        assert!(result.wear_level.is_none());
+    }
+
+    #[test]
+    fn test_parse_sata_wear_level_multiple_ids() {
+        let smart = SmartCtl::new();
+        // IDs 202, 231, 233 all map to wear_level — last one wins
+        let json = json!({
+            "ata_smart_attributes": {
+                "table": [
+                    {"id": 202, "raw": {"value": 80}},
+                    {"id": 233, "raw": {"value": 90}},
+                ]
+            }
+        });
+
+        let result = smart.parse_sata(test_device(), &json);
+        assert_eq!(result.wear_level, Some(90.0));
+    }
+
+    #[test]
+    fn test_parse_sata_attr_190_also_sets_temperature() {
+        let smart = SmartCtl::new();
+        let json = json!({
+            "ata_smart_attributes": {
+                "table": [
+                    {"id": 190, "raw": {"value": 38}}
+                ]
+            }
+        });
+
+        let result = smart.parse_sata(test_device(), &json);
+        assert_eq!(result.temperature, Some(38.0));
+    }
+}
