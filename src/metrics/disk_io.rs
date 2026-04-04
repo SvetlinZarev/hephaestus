@@ -1,9 +1,9 @@
 use crate::domain::{Collector, Metric};
 use crate::metrics::no_operation::NoOpCollector;
 use crate::metrics::util::{into_labels, maybe_counter, update_measurement_if};
-use prometheus::Registry;
 use prometheus::core::Desc;
 use prometheus::proto::{LabelPair, MetricFamily};
+use prometheus::Registry;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -231,5 +231,71 @@ where
         });
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    struct NoopDataSource;
+
+    impl DataSource for NoopDataSource {
+        async fn disk_io(&self) -> anyhow::Result<DiskIoStats> {
+            unimplemented!()
+        }
+    }
+
+    fn create_collector() -> DiskIoCollector<NoopDataSource> {
+        DiskIoCollector {
+            measurement: Arc::new(Mutex::new(None)),
+            data_source: NoopDataSource,
+        }
+    }
+
+    #[test]
+    fn test_should_collect_loop_device() {
+        let collector = create_collector();
+        assert!(!collector.should_collect("loop0"));
+        assert!(!collector.should_collect("loop12"));
+    }
+
+    #[test]
+    fn test_should_collect_zram_device() {
+        let collector = create_collector();
+        assert!(!collector.should_collect("zram0"));
+    }
+
+    #[test]
+    fn test_should_collect_nvme_whole_disk() {
+        let collector = create_collector();
+        assert!(collector.should_collect("nvme0n1"));
+    }
+
+    #[test]
+    fn test_should_collect_nvme_partition() {
+        let collector = create_collector();
+        assert!(!collector.should_collect("nvme0n1p1"));
+        assert!(!collector.should_collect("nvme0n1p2"));
+    }
+
+    #[test]
+    fn test_should_collect_sda_whole_disk() {
+        let collector = create_collector();
+        assert!(collector.should_collect("sda"));
+        assert!(collector.should_collect("sdb"));
+    }
+
+    #[test]
+    fn test_should_collect_sda_partition() {
+        let collector = create_collector();
+        assert!(!collector.should_collect("sda1"));
+        assert!(!collector.should_collect("sdb2"));
+    }
+
+    #[test]
+    fn test_should_collect_dm_device() {
+        let collector = create_collector();
+        assert!(collector.should_collect("dm-0"));
     }
 }
