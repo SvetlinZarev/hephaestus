@@ -1,12 +1,11 @@
 use crate::domain::{Collector, Metric};
 use crate::metrics::no_operation::NoOpCollector;
-use crate::metrics::util::{into_labels, maybe_counter, maybe_gauge, update_measurement_if};
+use crate::metrics::util::{Measurement, into_labels, maybe_counter, maybe_gauge};
 use prometheus::Registry;
 use prometheus::core::Desc;
 use prometheus::proto::{LabelPair, MetricFamily};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
 use tokio::time::Instant;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -110,7 +109,7 @@ pub trait DataSource {
 
 #[derive(Clone)]
 pub struct Metrics {
-    state: Arc<Mutex<Option<SmartReports>>>,
+    state: Measurement<SmartReports>,
 
     sata_temp: Desc,
     sata_temp_min: Desc,
@@ -138,7 +137,7 @@ pub struct Metrics {
 }
 
 impl Metrics {
-    pub fn new(state: Arc<Mutex<Option<SmartReports>>>) -> anyhow::Result<Self> {
+    pub fn new(state: Measurement<SmartReports>) -> anyhow::Result<Self> {
         let labels = vec!["device".into(), "model".into(), "serial_number".into()];
 
         Ok(Self {
@@ -325,48 +324,47 @@ impl prometheus::core::Collector for Metrics {
     }
 
     fn collect(&self) -> Vec<MetricFamily> {
-        let guard = self.state.lock().unwrap_or_else(|e| e.into_inner());
-        let Some(stats) = guard.as_ref() else {
-            return vec![];
-        };
+        self.state
+            .read(|stats| {
+                let mut families = Vec::new();
 
-        let mut families = Vec::new();
+                for n in &stats.nvme {
+                    let l = self.make_labels(&n.device);
+                    let f = &mut families;
 
-        for n in &stats.nvme {
-            let l = self.make_labels(&n.device);
-            let f = &mut families;
+                    maybe_gauge(f, &self.nvme_temp, &l, n.temperature);
+                    maybe_gauge(f, &self.nvme_available_spare, &l, n.available_spare);
+                    maybe_gauge(f, &self.nvme_percent_used, &l, n.percent_used);
+                    maybe_counter(f, &self.nvme_data_read, &l, n.data_units_read);
+                    maybe_counter(f, &self.nvme_data_written, &l, n.data_units_written);
+                    maybe_counter(f, &self.nvme_host_reads, &l, n.host_reads);
+                    maybe_counter(f, &self.nvme_host_writes, &l, n.host_writes);
+                    maybe_counter(f, &self.nvme_power_on, &l, n.power_on_hours);
+                    maybe_counter(f, &self.nvme_unsafe_shutdowns, &l, n.unsafe_shutdowns);
+                    maybe_counter(f, &self.nvme_media_errors, &l, n.media_errors);
+                }
 
-            maybe_gauge(f, &self.nvme_temp, &l, n.temperature);
-            maybe_gauge(f, &self.nvme_available_spare, &l, n.available_spare);
-            maybe_gauge(f, &self.nvme_percent_used, &l, n.percent_used);
-            maybe_counter(f, &self.nvme_data_read, &l, n.data_units_read);
-            maybe_counter(f, &self.nvme_data_written, &l, n.data_units_written);
-            maybe_counter(f, &self.nvme_host_reads, &l, n.host_reads);
-            maybe_counter(f, &self.nvme_host_writes, &l, n.host_writes);
-            maybe_counter(f, &self.nvme_power_on, &l, n.power_on_hours);
-            maybe_counter(f, &self.nvme_unsafe_shutdowns, &l, n.unsafe_shutdowns);
-            maybe_counter(f, &self.nvme_media_errors, &l, n.media_errors);
-        }
+                for s in &stats.sata {
+                    let l = self.make_labels(&s.device);
+                    let f = &mut families;
 
-        for s in &stats.sata {
-            let l = self.make_labels(&s.device);
-            let f = &mut families;
+                    maybe_gauge(f, &self.sata_temp, &l, s.temperature);
+                    maybe_gauge(f, &self.sata_temp_min, &l, s.temperature_min);
+                    maybe_gauge(f, &self.sata_temp_max, &l, s.temperature_max);
+                    maybe_gauge(f, &self.sata_pending, &l, s.pending_sectors);
+                    maybe_gauge(f, &self.sata_reallocated, &l, s.reallocated_sectors);
+                    maybe_gauge(f, &self.sata_wear_level, &l, s.wear_level);
+                    maybe_counter(f, &self.sata_start_stop, &l, s.start_stop_count);
+                    maybe_counter(f, &self.sata_power_on, &l, s.power_on_hours);
+                    maybe_counter(f, &self.sata_power_cycle, &l, s.power_cycle_count);
+                    maybe_counter(f, &self.sata_load_cycle, &l, s.load_cycle_count);
+                    maybe_counter(f, &self.sata_uncorrectable, &l, s.uncorrectable_errors);
+                    maybe_counter(f, &self.sata_crc_errors, &l, s.crc_errors);
+                }
 
-            maybe_gauge(f, &self.sata_temp, &l, s.temperature);
-            maybe_gauge(f, &self.sata_temp_min, &l, s.temperature_min);
-            maybe_gauge(f, &self.sata_temp_max, &l, s.temperature_max);
-            maybe_gauge(f, &self.sata_pending, &l, s.pending_sectors);
-            maybe_gauge(f, &self.sata_reallocated, &l, s.reallocated_sectors);
-            maybe_gauge(f, &self.sata_wear_level, &l, s.wear_level);
-            maybe_counter(f, &self.sata_start_stop, &l, s.start_stop_count);
-            maybe_counter(f, &self.sata_power_on, &l, s.power_on_hours);
-            maybe_counter(f, &self.sata_power_cycle, &l, s.power_cycle_count);
-            maybe_counter(f, &self.sata_load_cycle, &l, s.load_cycle_count);
-            maybe_counter(f, &self.sata_uncorrectable, &l, s.uncorrectable_errors);
-            maybe_counter(f, &self.sata_crc_errors, &l, s.crc_errors);
-        }
-
-        families
+                families
+            })
+            .unwrap_or_default()
     }
 }
 
@@ -397,9 +395,8 @@ where
         }
 
         let collector = SmartCollector::new(self.data_source);
-        let measurements = collector.measurements();
 
-        let metrics = Metrics::new(measurements)?;
+        let metrics = Metrics::new(collector.measurement.clone())?;
         registry.register(Box::new(metrics))?;
 
         Ok(Box::new(collector))
@@ -407,7 +404,7 @@ where
 }
 
 struct SmartCollector<T> {
-    measurement: Arc<Mutex<Option<SmartReports>>>,
+    measurement: Measurement<SmartReports>,
     data_source: T,
 }
 
@@ -418,12 +415,8 @@ where
     fn new(data_source: T) -> Self {
         Self {
             data_source,
-            measurement: Arc::new(Mutex::new(None)),
+            measurement: Measurement::new(),
         }
-    }
-
-    fn measurements(&self) -> Arc<Mutex<Option<SmartReports>>> {
-        self.measurement.clone()
     }
 }
 
@@ -441,9 +434,8 @@ where
             .inspect_err(|e| tracing::error!(error=?e, "Failed to collect disk SMART statistics"))
             .ok();
 
-        update_measurement_if(&self.measurement, stats, |old, new| {
-            old.timestamp < new.timestamp
-        });
+        self.measurement
+            .update_if(stats, |old, new| old.timestamp < new.timestamp);
 
         Ok(())
     }

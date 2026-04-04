@@ -1,12 +1,11 @@
 use crate::domain::{Collector, Metric};
 use crate::metrics::no_operation::NoOpCollector;
-use crate::metrics::util::{into_labels, maybe_counter, update_measurement_if};
+use crate::metrics::util::{Measurement, into_labels, maybe_counter};
 use prometheus::Registry;
 use prometheus::core::Desc;
 use prometheus::proto::{LabelPair, MetricFamily};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
 use tokio::time::Instant;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -41,7 +40,7 @@ pub trait DataSource {
 
 #[derive(Clone)]
 struct Metrics {
-    state: Arc<Mutex<Option<DiskIoStats>>>,
+    state: Measurement<DiskIoStats>,
     bytes_read: Desc,
     bytes_written: Desc,
     read_ops: Desc,
@@ -49,7 +48,7 @@ struct Metrics {
 }
 
 impl Metrics {
-    pub fn new(state: Arc<Mutex<Option<DiskIoStats>>>) -> anyhow::Result<Self> {
+    pub fn new(state: Measurement<DiskIoStats>) -> anyhow::Result<Self> {
         let labels = vec!["device".to_owned()];
 
         let bytes_read = Desc::new(
@@ -110,21 +109,19 @@ impl prometheus::core::Collector for Metrics {
     }
 
     fn collect(&self) -> Vec<MetricFamily> {
-        let guard = self.state.lock().unwrap_or_else(|e| e.into_inner());
-        let Some(stats) = guard.as_ref() else {
-            return vec![];
-        };
-
-        let mut mf = Vec::with_capacity(stats.disks.len());
-        for device in &stats.disks {
-            let l = self.make_labels(device);
-            maybe_counter(&mut mf, &self.bytes_read, &l, Some(device.bytes_read));
-            maybe_counter(&mut mf, &self.bytes_written, &l, Some(device.bytes_written));
-            maybe_counter(&mut mf, &self.read_ops, &l, Some(device.read_ops));
-            maybe_counter(&mut mf, &self.write_ops, &l, Some(device.write_ops));
-        }
-
-        mf
+        self.state
+            .read(|stats| {
+                let mut mf = Vec::with_capacity(stats.disks.len());
+                for device in &stats.disks {
+                    let l = self.make_labels(device);
+                    maybe_counter(&mut mf, &self.bytes_read, &l, Some(device.bytes_read));
+                    maybe_counter(&mut mf, &self.bytes_written, &l, Some(device.bytes_written));
+                    maybe_counter(&mut mf, &self.read_ops, &l, Some(device.read_ops));
+                    maybe_counter(&mut mf, &self.write_ops, &l, Some(device.write_ops));
+                }
+                mf
+            })
+            .unwrap_or_default()
     }
 }
 
@@ -155,9 +152,8 @@ where
         }
 
         let collector = DiskIoCollector::new(self.data_source);
-        let measurements = collector.measurements();
 
-        let metrics = Metrics::new(measurements)?;
+        let metrics = Metrics::new(collector.measurement.clone())?;
         metrics.register(registry)?;
 
         Ok(Box::new(collector))
@@ -165,7 +161,7 @@ where
 }
 
 struct DiskIoCollector<T> {
-    measurement: Arc<Mutex<Option<DiskIoStats>>>,
+    measurement: Measurement<DiskIoStats>,
     data_source: T,
 }
 
@@ -175,13 +171,9 @@ where
 {
     fn new(data_source: T) -> Self {
         Self {
-            measurement: Arc::new(Mutex::new(None)),
+            measurement: Measurement::new(),
             data_source,
         }
-    }
-
-    fn measurements(&self) -> Arc<Mutex<Option<DiskIoStats>>> {
-        Arc::clone(&self.measurement)
     }
 
     fn should_collect(&self, device_name: &str) -> bool {
@@ -226,9 +218,8 @@ where
             .inspect_err(|err| tracing::error!(error=?err, "Failed to collect disk IO statistics"))
             .ok();
 
-        update_measurement_if(&self.measurement, stats, |old, new| {
-            old.timestamp < new.timestamp
-        });
+        self.measurement
+            .update_if(stats, |old, new| old.timestamp < new.timestamp);
 
         Ok(())
     }
@@ -248,7 +239,7 @@ mod tests {
 
     fn create_collector() -> DiskIoCollector<NoopDataSource> {
         DiskIoCollector {
-            measurement: Arc::new(Mutex::new(None)),
+            measurement: Measurement::new(),
             data_source: NoopDataSource,
         }
     }

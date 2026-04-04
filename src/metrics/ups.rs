@@ -1,12 +1,11 @@
 use crate::domain::{Collector, Metric};
 use crate::metrics::no_operation::NoOpCollector;
-use crate::metrics::util::update_measurement_if;
+use crate::metrics::util::Measurement;
 use prometheus::Registry;
 use prometheus::core::Desc;
 use prometheus::proto::{LabelPair, MetricFamily, MetricType};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
 use tokio::time::Instant;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -50,7 +49,7 @@ pub trait DataSource {
 
 #[derive(Clone)]
 pub struct Metrics {
-    state: Arc<Mutex<Option<UpsStats>>>,
+    state: Measurement<UpsStats>,
     runtime: Desc,
     battery_level: Desc,
     input_voltage: Desc,
@@ -63,7 +62,7 @@ pub struct Metrics {
 }
 
 impl Metrics {
-    pub fn new(state: Arc<Mutex<Option<UpsStats>>>) -> anyhow::Result<Self> {
+    pub fn new(state: Measurement<UpsStats>) -> anyhow::Result<Self> {
         let labels = vec!["ups".to_string()];
         let runtime = Desc::new(
             "system_ups_runtime_seconds".into(),
@@ -185,30 +184,35 @@ impl prometheus::core::Collector for Metrics {
     }
 
     fn collect(&self) -> Vec<MetricFamily> {
-        let guard = self.state.lock().unwrap_or_else(|e| e.into_inner());
-        let Some(stats) = guard.as_ref() else {
-            return vec![];
-        };
+        self.state
+            .read(|stats| {
+                let mut mf = Vec::new();
 
-        let mut mf = Vec::new();
+                mf.push(self.build_metric_family(&self.runtime, stats, |u| u.estimated_runtime));
+                mf.push(self.build_metric_family(&self.battery_level, stats, |u| u.battery_level));
+                mf.push(
+                    self.build_metric_family(&self.nominal_apparent_power, stats, |u| {
+                        u.nominal_apparent_power
+                    }),
+                );
+                mf.push(
+                    self.build_metric_family(&self.nominal_real_power, stats, |u| {
+                        u.nominal_real_power
+                    }),
+                );
+                mf.push(
+                    self.build_metric_family(&self.apparent_power, stats, |u| u.apparent_power),
+                );
+                mf.push(self.build_metric_family(&self.real_power, stats, |u| u.real_power));
+                mf.push(self.build_metric_family(&self.load, stats, |u| u.load));
+                mf.push(self.build_metric_family(&self.input_voltage, stats, |u| u.input_voltage));
+                mf.push(
+                    self.build_metric_family(&self.output_voltage, stats, |u| u.output_voltage),
+                );
 
-        mf.push(self.build_metric_family(&self.runtime, stats, |u| u.estimated_runtime));
-        mf.push(self.build_metric_family(&self.battery_level, stats, |u| u.battery_level));
-        mf.push(
-            self.build_metric_family(&self.nominal_apparent_power, stats, |u| {
-                u.nominal_apparent_power
-            }),
-        );
-        mf.push(
-            self.build_metric_family(&self.nominal_real_power, stats, |u| u.nominal_real_power),
-        );
-        mf.push(self.build_metric_family(&self.apparent_power, stats, |u| u.apparent_power));
-        mf.push(self.build_metric_family(&self.real_power, stats, |u| u.real_power));
-        mf.push(self.build_metric_family(&self.load, stats, |u| u.load));
-        mf.push(self.build_metric_family(&self.input_voltage, stats, |u| u.input_voltage));
-        mf.push(self.build_metric_family(&self.output_voltage, stats, |u| u.output_voltage));
-
-        mf
+                mf
+            })
+            .unwrap_or_default()
     }
 }
 
@@ -239,9 +243,8 @@ where
         }
 
         let collector = UpsCollector::new(self.data_source);
-        let measurements = collector.measurements();
 
-        let metrics = Metrics::new(measurements)?;
+        let metrics = Metrics::new(collector.measurement.clone())?;
         metrics.register(registry)?;
 
         Ok(Box::new(collector))
@@ -250,7 +253,7 @@ where
 
 struct UpsCollector<T> {
     data_source: T,
-    measurement: Arc<Mutex<Option<UpsStats>>>,
+    measurement: Measurement<UpsStats>,
 }
 
 impl<T> UpsCollector<T>
@@ -260,12 +263,8 @@ where
     pub fn new(data_source: T) -> Self {
         Self {
             data_source,
-            measurement: Arc::new(Mutex::new(None)),
+            measurement: Measurement::new(),
         }
-    }
-
-    fn measurements(&self) -> Arc<Mutex<Option<UpsStats>>> {
-        self.measurement.clone()
     }
 }
 
@@ -283,9 +282,8 @@ where
             .inspect_err(|e| tracing::error!(error=?e, "Failed to collect UPS statistics"))
             .ok();
 
-        update_measurement_if(&self.measurement, stats, |old, new| {
-            old.timestamp < new.timestamp
-        });
+        self.measurement
+            .update_if(stats, |old, new| old.timestamp < new.timestamp);
 
         Ok(())
     }

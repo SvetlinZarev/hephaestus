@@ -1,11 +1,10 @@
 use crate::domain::{Collector, Metric};
 use crate::metrics::no_operation::NoOpCollector;
-use crate::metrics::util::{maybe_counter, update_measurement_if};
+use crate::metrics::util::{Measurement, maybe_counter};
 use prometheus::Registry;
 use prometheus::core::Desc;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
 use tokio::time;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -41,7 +40,7 @@ pub trait DataSource {
 
 #[derive(Clone)]
 struct Metrics {
-    state: Arc<Mutex<Option<ZfsIoStats>>>,
+    state: Measurement<ZfsIoStats>,
     reads: Desc,
     writes: Desc,
     nread: Desc,
@@ -49,7 +48,7 @@ struct Metrics {
 }
 
 impl Metrics {
-    pub fn new(state: Arc<Mutex<Option<ZfsIoStats>>>) -> anyhow::Result<Self> {
+    pub fn new(state: Measurement<ZfsIoStats>) -> anyhow::Result<Self> {
         let labels = vec!["pool".to_owned(), "dataset".to_owned()];
 
         Ok(Self {
@@ -93,22 +92,23 @@ impl prometheus::core::Collector for Metrics {
     }
 
     fn collect(&self) -> Vec<prometheus::proto::MetricFamily> {
-        let guard = self.state.lock().unwrap_or_else(|e| e.into_inner());
-        let Some(stats) = guard.as_ref() else {
-            return vec![];
-        };
+        self.state
+            .read(|stats| {
+                let mut mf = Vec::with_capacity(stats.datasets.len() * 4);
+                for ds in &stats.datasets {
+                    let l = crate::metrics::util::into_labels(&[
+                        ("pool", &ds.pool),
+                        ("dataset", &ds.dataset),
+                    ]);
 
-        let mut mf = Vec::with_capacity(stats.datasets.len() * 4);
-        for ds in &stats.datasets {
-            let l =
-                crate::metrics::util::into_labels(&[("pool", &ds.pool), ("dataset", &ds.dataset)]);
-
-            maybe_counter(&mut mf, &self.reads, &l, Some(ds.reads));
-            maybe_counter(&mut mf, &self.writes, &l, Some(ds.writes));
-            maybe_counter(&mut mf, &self.nread, &l, Some(ds.nread));
-            maybe_counter(&mut mf, &self.nwritten, &l, Some(ds.nwritten));
-        }
-        mf
+                    maybe_counter(&mut mf, &self.reads, &l, Some(ds.reads));
+                    maybe_counter(&mut mf, &self.writes, &l, Some(ds.writes));
+                    maybe_counter(&mut mf, &self.nread, &l, Some(ds.nread));
+                    maybe_counter(&mut mf, &self.nwritten, &l, Some(ds.nwritten));
+                }
+                mf
+            })
+            .unwrap_or_default()
     }
 }
 
@@ -139,7 +139,7 @@ where
         }
 
         let collector = ZfsDatasetIoCollector::new(self.data_source);
-        let metrics = Metrics::new(collector.measurements())?;
+        let metrics = Metrics::new(collector.measurement.clone())?;
         metrics.register(registry)?;
 
         Ok(Box::new(collector))
@@ -147,7 +147,7 @@ where
 }
 
 struct ZfsDatasetIoCollector<T> {
-    measurement: Arc<Mutex<Option<ZfsIoStats>>>,
+    measurement: Measurement<ZfsIoStats>,
     data_source: T,
 }
 
@@ -157,13 +157,9 @@ where
 {
     fn new(data_source: T) -> Self {
         Self {
-            measurement: Arc::new(Mutex::new(None)),
+            measurement: Measurement::new(),
             data_source,
         }
-    }
-
-    fn measurements(&self) -> Arc<Mutex<Option<ZfsIoStats>>> {
-        Arc::clone(&self.measurement)
     }
 }
 
@@ -181,9 +177,8 @@ where
             .inspect_err(|e| tracing::error!(error=?e, "Failed to collect ZFS dataset statistics"))
             .ok();
 
-        update_measurement_if(&self.measurement, stats, |old, new| {
-            old.timestamp < new.timestamp
-        });
+        self.measurement
+            .update_if(stats, |old, new| old.timestamp < new.timestamp);
 
         Ok(())
     }

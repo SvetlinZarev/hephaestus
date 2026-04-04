@@ -1,7 +1,53 @@
 use num_traits::ToPrimitive;
 use prometheus::core::Desc;
 use prometheus::proto::{LabelPair, MetricFamily, MetricType};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
+
+pub struct Measurement<T> {
+    inner: Arc<Mutex<Option<T>>>,
+}
+
+impl<T> Clone for Measurement<T> {
+    fn clone(&self) -> Self {
+        Self {
+            inner: Arc::clone(&self.inner),
+        }
+    }
+}
+
+impl<T> Measurement<T> {
+    pub fn new() -> Self {
+        Self {
+            inner: Arc::new(Mutex::new(None)),
+        }
+    }
+
+    pub fn update_if(&self, value: Option<T>, predicate: impl Fn(&T, &T) -> bool) {
+        let mut guard = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+
+        // If a metric collector has failed, we want to
+        // stop exposing that metric instead of reporting
+        // the previous, stale value
+        let Some(value) = value else {
+            *guard = None;
+            return;
+        };
+
+        match guard.as_ref() {
+            None => *guard = Some(value),
+            Some(prev) => {
+                if predicate(prev, &value) {
+                    *guard = Some(value);
+                }
+            }
+        }
+    }
+
+    pub fn read<R>(&self, mapper: impl FnOnce(&T) -> R) -> Option<R> {
+        let guard = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+        guard.as_ref().map(mapper)
+    }
+}
 
 pub fn into_labels(kv: &[(&str, &str)]) -> Vec<LabelPair> {
     kv.iter()
@@ -79,64 +125,10 @@ pub fn counter(desc: &Desc, label_values: Vec<LabelPair>, value: f64) -> MetricF
     mf
 }
 
-pub fn update_measurement_if<T>(
-    target: &Mutex<Option<T>>,
-    value: Option<T>,
-    predicate: impl Fn(&T, &T) -> bool,
-) {
-    let mut guard = target.lock().unwrap_or_else(|e| e.into_inner());
-
-    // If a metric collector has failed, we want to
-    // stop exposing that metric instead of reporting
-    // the previous, stale value
-    let Some(value) = value else {
-        *guard = None;
-        return;
-    };
-
-    match guard.as_ref() {
-        None => *guard = Some(value),
-        Some(prev) => {
-            if predicate(prev, &value) {
-                *guard = Some(value);
-            }
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::collections::HashMap;
-    use std::sync::Mutex;
-
-    #[test]
-    fn test_update_none_clears_existing() {
-        let target = Mutex::new(Some(42));
-        update_measurement_if(&target, None, |_, _| true);
-        assert!(target.lock().unwrap().is_none());
-    }
-
-    #[test]
-    fn test_update_some_sets_when_empty() {
-        let target: Mutex<Option<i32>> = Mutex::new(None);
-        update_measurement_if(&target, Some(42), |_, _| false); // predicate is irrelevant
-        assert_eq!(*target.lock().unwrap(), Some(42));
-    }
-
-    #[test]
-    fn test_update_predicate_true_replaces() {
-        let target = Mutex::new(Some(1));
-        update_measurement_if(&target, Some(2), |old, new| *new > *old);
-        assert_eq!(*target.lock().unwrap(), Some(2));
-    }
-
-    #[test]
-    fn test_update_predicate_false_keeps_old() {
-        let target = Mutex::new(Some(10));
-        update_measurement_if(&target, Some(5), |old, new| *new > *old);
-        assert_eq!(*target.lock().unwrap(), Some(10));
-    }
 
     fn create_test_desc(name: &str) -> Desc {
         Desc::new(name.into(), "test".into(), vec![], HashMap::new()).unwrap()
@@ -184,5 +176,42 @@ mod tests {
         assert_eq!(labels[0].value(), "sda");
         assert_eq!(labels[1].name(), "model");
         assert_eq!(labels[1].value(), "WD");
+    }
+
+    #[test]
+    fn test_store_new_is_empty() {
+        let store = Measurement::<i32>::new();
+        assert!(store.read(|v| *v).is_none());
+    }
+
+    #[test]
+    fn test_store_update_sets_value() {
+        let store = Measurement::new();
+        store.update_if(Some(42), |_, _| true);
+        assert_eq!(store.read(|v| *v), Some(42));
+    }
+
+    #[test]
+    fn test_store_update_none_clears() {
+        let store = Measurement::new();
+        store.update_if(Some(42), |_, _| true);
+        store.update_if(None, |_, _| true);
+        assert!(store.read(|v| *v).is_none());
+    }
+
+    #[test]
+    fn test_store_predicate_respected() {
+        let store = Measurement::new();
+        store.update_if(Some(10), |_, _| true);
+        store.update_if(Some(5), |old, new| *new > *old);
+        assert_eq!(store.read(|v| *v), Some(10));
+    }
+
+    #[test]
+    fn test_store_clone_shares_state() {
+        let store = Measurement::new();
+        let clone = store.clone();
+        store.update_if(Some(99), |_, _| true);
+        assert_eq!(clone.read(|v| *v), Some(99));
     }
 }

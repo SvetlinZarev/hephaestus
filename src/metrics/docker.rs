@@ -1,12 +1,11 @@
 use crate::domain::{Collector, Metric};
 use crate::metrics::no_operation::NoOpCollector;
-use crate::metrics::util::{into_labels, maybe_counter, maybe_gauge, update_measurement_if};
+use crate::metrics::util::{Measurement, into_labels, maybe_counter, maybe_gauge};
 use prometheus::Registry;
 use prometheus::core::Desc;
 use prometheus::proto::{LabelPair, MetricFamily};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
 use tokio::time::Instant;
 
 #[derive(Debug, Clone)]
@@ -30,7 +29,7 @@ pub trait DataSource {
 
 #[derive(Clone)]
 struct Metrics {
-    state: Arc<Mutex<Option<DockerStats>>>,
+    state: Measurement<DockerStats>,
     cpu_usage: Desc,
     mem_usage: Desc,
     net_rx: Desc,
@@ -38,7 +37,7 @@ struct Metrics {
 }
 
 impl Metrics {
-    pub fn new(state: Arc<Mutex<Option<DockerStats>>>) -> anyhow::Result<Self> {
+    pub fn new(state: Measurement<DockerStats>) -> anyhow::Result<Self> {
         let labels = vec!["container".to_owned()];
 
         Ok(Self {
@@ -86,21 +85,19 @@ impl prometheus::core::Collector for Metrics {
     }
 
     fn collect(&self) -> Vec<MetricFamily> {
-        let guard = self.state.lock().unwrap_or_else(|e| e.into_inner());
-        let Some(stats) = guard.as_ref() else {
-            return vec![];
-        };
-
-        let mut mf = Vec::with_capacity(stats.containers.len() * 4);
-        for container in &stats.containers {
-            let l = self.make_labels(container);
-            maybe_gauge(&mut mf, &self.cpu_usage, &l, container.cpu_usage);
-            maybe_gauge(&mut mf, &self.mem_usage, &l, container.mem_usage_bytes);
-            maybe_counter(&mut mf, &self.net_rx, &l, container.net_rx_bytes);
-            maybe_counter(&mut mf, &self.net_tx, &l, container.net_tx_bytes);
-        }
-
-        mf
+        self.state
+            .read(|stats| {
+                let mut mf = Vec::with_capacity(stats.containers.len() * 4);
+                for container in &stats.containers {
+                    let l = self.make_labels(container);
+                    maybe_gauge(&mut mf, &self.cpu_usage, &l, container.cpu_usage);
+                    maybe_gauge(&mut mf, &self.mem_usage, &l, container.mem_usage_bytes);
+                    maybe_counter(&mut mf, &self.net_rx, &l, container.net_rx_bytes);
+                    maybe_counter(&mut mf, &self.net_tx, &l, container.net_tx_bytes);
+                }
+                mf
+            })
+            .unwrap_or_default()
     }
 }
 
@@ -142,9 +139,8 @@ where
         }
 
         let collector = DockerCollector::new(self.data_source);
-        let measurements = collector.measurements();
 
-        let metrics = Metrics::new(measurements)?;
+        let metrics = Metrics::new(collector.measurement.clone())?;
         metrics.register(registry)?;
 
         Ok(Box::new(collector))
@@ -152,7 +148,7 @@ where
 }
 
 struct DockerCollector<T> {
-    measurement: Arc<Mutex<Option<DockerStats>>>,
+    measurement: Measurement<DockerStats>,
     data_source: T,
 }
 
@@ -162,13 +158,9 @@ where
 {
     fn new(data_source: T) -> Self {
         Self {
-            measurement: Arc::new(Mutex::new(None)),
+            measurement: Measurement::new(),
             data_source,
         }
-    }
-
-    fn measurements(&self) -> Arc<Mutex<Option<DockerStats>>> {
-        Arc::clone(&self.measurement)
     }
 }
 
@@ -186,9 +178,8 @@ where
             .inspect_err(|e| tracing::error!(error=?e, "Failed to collect docker statistics"))
             .ok();
 
-        update_measurement_if(&self.measurement, stats, |old, new| {
-            old.timestamp < new.timestamp
-        });
+        self.measurement
+            .update_if(stats, |old, new| old.timestamp < new.timestamp);
 
         Ok(())
     }
