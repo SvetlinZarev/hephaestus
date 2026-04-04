@@ -134,11 +134,6 @@ impl Metrics {
         })
     }
 
-    pub fn register(&self, registry: &Registry) -> anyhow::Result<()> {
-        registry.register(Box::new(self.clone()))?;
-        Ok(())
-    }
-
     fn build_metric_family<F>(&self, desc: &Desc, stats: &UpsStats, extract: F) -> MetricFamily
     where
         F: Fn(&UpsDeviceStats) -> Option<f64>,
@@ -245,7 +240,7 @@ where
         let collector = UpsCollector::new(self.data_source);
 
         let metrics = Metrics::new(collector.measurement.clone())?;
-        metrics.register(registry)?;
+        registry.register(Box::new(metrics))?;
 
         Ok(Box::new(collector))
     }

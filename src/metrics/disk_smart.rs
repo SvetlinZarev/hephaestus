@@ -281,11 +281,6 @@ impl Metrics {
         })
     }
 
-    pub fn register(&self, registry: &Registry) -> anyhow::Result<()> {
-        registry.register(Box::new(self.clone()))?;
-        Ok(())
-    }
-
     fn make_labels(&self, device: &Device) -> Vec<LabelPair> {
         into_labels(&[
             ("device", &device.device),
