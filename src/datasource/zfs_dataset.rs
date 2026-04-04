@@ -1,6 +1,5 @@
 use crate::datasource::Reader;
 use crate::metrics::zfs_dataset::{DataSource, DatasetIoStats, ZfsDatasetStats};
-use tokio::fs;
 
 const KSTAT_ZFS: &str = "/proc/spl/kstat/zfs";
 
@@ -61,26 +60,22 @@ where
     async fn zfs_dataset(&self) -> anyhow::Result<ZfsDatasetStats> {
         let mut datasets = Vec::new();
 
-        let mut pool_entries = fs::read_dir(KSTAT_ZFS).await?;
-        while let Some(pool_entry) = pool_entries.next_entry().await? {
-            let path = pool_entry.path();
-            if !path.is_dir() {
+        let pool_entries = self.reader.read_dir(KSTAT_ZFS).await?;
+        for pool_entry in pool_entries {
+            if !pool_entry.is_dir {
                 continue;
             }
 
-            let pool_name = pool_entry.file_name();
-            let pool_name = pool_name.to_string_lossy();
+            let pool_name = &pool_entry.name;
 
-            let mut objset_entries = fs::read_dir(&path).await?;
-            while let Some(obj_entry) = objset_entries.next_entry().await? {
-                let filename = obj_entry.file_name();
-                let filename = filename.to_string_lossy();
-                if !filename.starts_with("objset-") {
+            let objset_entries = self.reader.read_dir(&pool_entry.path).await?;
+            for obj_entry in objset_entries {
+                if !obj_entry.name.starts_with("objset-") {
                     continue;
                 }
 
-                let content = self.reader.read_to_string(obj_entry.path()).await?;
-                if let Some(ds_stats) = self.parse_objset(&pool_name, &content) {
+                let content = self.reader.read_to_string(&obj_entry.path).await?;
+                if let Some(ds_stats) = self.parse_objset(pool_name, &content) {
                     datasets.push(ds_stats);
                 }
             }
