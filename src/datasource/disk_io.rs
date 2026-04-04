@@ -43,7 +43,7 @@ where
 
             if device.starts_with("loop")
                 || device.starts_with("zram")
-                || device.starts_with("md1p")
+                || device.starts_with("md")
             {
                 tracing::debug!("Skipping device: {}", device);
                 continue;
