@@ -31,7 +31,7 @@ where
             match self.reader.read_to_string(&path).await {
                 Ok(content) => {
                     let freq = content.trim().parse::<u64>().unwrap_or_else(|_| {
-                        tracing::error!("Failed to parse teh CPU frequency for core {}", core);
+                        tracing::error!("Failed to parse the CPU frequency for core {}", core);
                         0
                     }) * 1000;
                     core_freq.push(freq);
