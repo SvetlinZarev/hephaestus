@@ -40,3 +40,6 @@ prometheus = "0.14.0"
 
 # Docker
 bollard = "*"
+
+[dev-dependencies]
+tempfile = "3"

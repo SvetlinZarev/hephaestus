@@ -41,6 +41,10 @@ pub fn init_collectors(
         metrics::disk_smart::Smart::new(config.collector.disk_smart.clone(), data_source);
     collectors.push(disk_smart.register(registry)?);
 
+    let data_source = datasource::thermal::Thermal::new(TokioReader::new());
+    let thermal = metrics::thermal::Thermal::new(config.collector.thermal.clone(), data_source);
+    collectors.push(thermal.register(registry)?);
+
     let data_source = datasource::nut::Nut::new(config.datasource.nut.clone())?;
     let ups = metrics::ups::Ups::new(config.collector.ups.clone(), data_source);
     collectors.push(ups.register(registry)?);

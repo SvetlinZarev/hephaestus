@@ -1,7 +1,7 @@
 use crate::datasource::nut;
 use crate::metrics::{
-    cpu_frequency, cpu_usage, disk_io, disk_smart, docker, memory_usage, network_io, ups, zfs_arc,
-    zfs_dataset,
+    cpu_frequency, cpu_usage, disk_io, disk_smart, docker, memory_usage, network_io, thermal, ups,
+    zfs_arc, zfs_dataset,
 };
 use config::Config;
 use serde::{Deserialize, Serialize};
@@ -87,6 +87,7 @@ pub struct Collectors {
     pub network_io: network_io::Config,
     pub disk_io: disk_io::Config,
     pub disk_smart: disk_smart::Config,
+    pub thermal: thermal::Config,
     pub ups: ups::Config,
     pub zfs_arc: zfs_arc::Config,
     pub zfs_dataset: zfs_dataset::Config,
