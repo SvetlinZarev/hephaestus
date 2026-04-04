@@ -45,7 +45,7 @@
 
 <FILE Name="&pluginDir;/&name;">
 <URL>&binaryURL;</URL>
-<MD5>efbbd84f0b4200f291ba2a2bd8cedd96</MD5>
+<MD5>2604ba3b8087b8eba97376b1ea7aed8f</MD5>
 </FILE>
 
 <FILE Name="/etc/rc.d/rc.&name;" Mode="0755">
