@@ -188,3 +188,114 @@ impl DataSource for Nut {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+
+    fn create_nut_instance() -> Nut {
+        Nut::new(Config::default()).unwrap()
+    }
+
+    fn full_params() -> HashMap<String, String> {
+        HashMap::from([
+            ("battery.runtime".to_string(), "3600".to_string()),
+            ("battery.charge".to_string(), "85".to_string()),
+            ("ups.load".to_string(), "25".to_string()),
+            ("input.voltage".to_string(), "120.5".to_string()),
+            ("output.voltage".to_string(), "119.8".to_string()),
+            ("ups.power.nominal".to_string(), "1500".to_string()),
+            ("ups.realpower.nominal".to_string(), "900".to_string()),
+            ("ups.power".to_string(), "375".to_string()),
+            ("ups.realpower".to_string(), "225".to_string()),
+        ])
+    }
+
+    #[test]
+    fn test_collect_full_parameters() {
+        let nut = create_nut_instance();
+        let stats = nut.collect_device_parameters("myups".to_string(), full_params());
+
+        assert_eq!(stats.device_name, "myups");
+        assert_eq!(stats.estimated_runtime, Some(3600.0));
+        assert!((stats.battery_level.unwrap() - 0.85).abs() < f64::EPSILON);
+        assert!((stats.load.unwrap() - 0.25).abs() < f64::EPSILON);
+        assert_eq!(stats.input_voltage, Some(120.5));
+        assert_eq!(stats.output_voltage, Some(119.8));
+        assert_eq!(stats.nominal_apparent_power, Some(1500.0));
+        assert_eq!(stats.nominal_real_power, Some(900.0));
+        assert_eq!(stats.apparent_power, Some(375.0));
+        assert_eq!(stats.real_power, Some(225.0));
+    }
+
+    #[test]
+    fn test_collect_empty_parameters() {
+        let nut = create_nut_instance();
+        let stats = nut.collect_device_parameters("myups".to_string(), HashMap::new());
+
+        assert_eq!(stats.device_name, "myups");
+        assert!(stats.estimated_runtime.is_none());
+        assert!(stats.battery_level.is_none());
+        assert!(stats.load.is_none());
+        assert!(stats.input_voltage.is_none());
+        assert!(stats.output_voltage.is_none());
+        assert!(stats.nominal_apparent_power.is_none());
+        assert!(stats.nominal_real_power.is_none());
+        assert!(stats.apparent_power.is_none());
+        assert!(stats.real_power.is_none());
+    }
+
+    #[test]
+    fn test_collect_derived_real_power() {
+        let nut = create_nut_instance();
+        let params = HashMap::from([
+            ("ups.load".to_string(), "50".to_string()),
+            ("ups.realpower.nominal".to_string(), "900".to_string()),
+        ]);
+
+        let stats = nut.collect_device_parameters("myups".to_string(), params);
+        assert!((stats.real_power.unwrap() - 450.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_collect_derived_apparent_power() {
+        let nut = create_nut_instance();
+        let params = HashMap::from([
+            ("ups.load".to_string(), "40".to_string()),
+            ("ups.power.nominal".to_string(), "1500".to_string()),
+        ]);
+
+        let stats = nut.collect_device_parameters("myups".to_string(), params);
+        assert!((stats.apparent_power.unwrap() - 600.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_collect_no_derived_power_without_load() {
+        let nut = create_nut_instance();
+        // Has nominal but no load → cannot derive
+        let params = HashMap::from([
+            ("ups.realpower.nominal".to_string(), "900".to_string()),
+            ("ups.power.nominal".to_string(), "1500".to_string()),
+        ]);
+
+        let stats = nut.collect_device_parameters("myups".to_string(), params);
+        assert!(stats.real_power.is_none());
+        assert!(stats.apparent_power.is_none());
+    }
+
+    #[test]
+    fn test_collect_alternative_keys() {
+        let nut = create_nut_instance();
+        let params = HashMap::from([
+            ("battery.level".to_string(), "90".to_string()),
+            ("output.load".to_string(), "30".to_string()),
+            ("battery.runtime.low".to_string(), "600".to_string()),
+        ]);
+
+        let stats = nut.collect_device_parameters("myups".to_string(), params);
+        assert!((stats.battery_level.unwrap() - 0.9).abs() < f64::EPSILON);
+        assert!((stats.load.unwrap() - 0.3).abs() < f64::EPSILON);
+        assert_eq!(stats.estimated_runtime, Some(600.0));
+    }
+}
