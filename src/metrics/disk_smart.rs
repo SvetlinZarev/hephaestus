@@ -152,13 +152,13 @@ impl Metrics {
                 HashMap::new(),
             )?,
             sata_temp_min: Desc::new(
-                "smart_sata_temperature_min_celsius".into(),
+                "system_smart_sata_temperature_min_celsius".into(),
                 "Minimum temperature recorded by the SATA device".into(),
                 labels.clone(),
                 HashMap::new(),
             )?,
             sata_temp_max: Desc::new(
-                "smart_sata_temperature_max_celsius".into(),
+                "system_smart_sata_temperature_max_celsius".into(),
                 "Maximum temperature recorded by the SATA device".into(),
                 labels.clone(),
                 HashMap::new(),
