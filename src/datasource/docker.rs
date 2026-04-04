@@ -183,3 +183,234 @@ fn calculate_network_usage(
 
     (Some(rx), Some(tx))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use bollard::models::{
+        ContainerCpuStats, ContainerCpuUsage, ContainerMemoryStats, ContainerNetworkStats,
+        ContainerSummary,
+    };
+    use std::collections::HashMap;
+
+    fn make_cpu_stats(total: u64, system: u64, cpus: u32) -> ContainerCpuStats {
+        ContainerCpuStats {
+            cpu_usage: Some(ContainerCpuUsage {
+                total_usage: Some(total),
+                ..Default::default()
+            }),
+            system_cpu_usage: Some(system),
+            online_cpus: Some(cpus),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn test_cpu_usage_no_previous_measurement() {
+        let stats = make_cpu_stats(1_000_000, 5_000_000, 4);
+        let prev = HashMap::new();
+
+        let (usage, measurement) = cpu_usage("test", Some(&stats), &prev);
+        assert!(usage.is_none());
+        assert!(measurement.is_some());
+        let m = measurement.unwrap();
+        assert_eq!(m.total, 1_000_000);
+        assert_eq!(m.system, 5_000_000);
+    }
+
+    #[test]
+    fn test_cpu_usage_normal_calculation() {
+        let stats = make_cpu_stats(2_000_000, 10_000_000, 4);
+        let mut prev = HashMap::new();
+        prev.insert(
+            "test".to_string(),
+            CpuStats {
+                total: 1_000_000,
+                system: 5_000_000,
+            },
+        );
+
+        let (usage, measurement) = cpu_usage("test", Some(&stats), &prev);
+        // cpu_delta = 1_000_000, sys_delta = 5_000_000
+        // usage = (1_000_000 / 5_000_000) * 4 = 0.8
+        assert!(usage.is_some());
+        assert!((usage.unwrap() - 0.8).abs() < f64::EPSILON);
+        assert!(measurement.is_some());
+    }
+
+    #[test]
+    fn test_cpu_usage_container_restart() {
+        // current.total <= previous.total indicates restart
+        let stats = make_cpu_stats(500, 10_000_000, 4);
+        let mut prev = HashMap::new();
+        prev.insert(
+            "test".to_string(),
+            CpuStats {
+                total: 1_000_000,
+                system: 5_000_000,
+            },
+        );
+
+        let (usage, measurement) = cpu_usage("test", Some(&stats), &prev);
+        assert!(usage.is_none());
+        assert!(measurement.is_some());
+    }
+
+    #[test]
+    fn test_cpu_usage_exceeding_cpu_count() {
+        let stats = make_cpu_stats(10_000_000, 2_000_000, 1);
+        let mut prev = HashMap::new();
+        prev.insert(
+            "test".to_string(),
+            CpuStats {
+                total: 1_000_000,
+                system: 1_000_000,
+            },
+        );
+
+        let (usage, measurement) = cpu_usage("test", Some(&stats), &prev);
+        assert!(usage.is_none());
+        assert!(measurement.is_some());
+    }
+
+    #[test]
+    fn test_cpu_usage_none_stats() {
+        let prev = HashMap::new();
+        let (usage, measurement) = cpu_usage("test", None, &prev);
+        assert!(usage.is_none());
+        assert!(measurement.is_none());
+    }
+
+    #[test]
+    fn test_cpu_usage_zero_deltas() {
+        let stats = make_cpu_stats(1_000_000, 5_000_000, 4);
+        let mut prev = HashMap::new();
+        prev.insert(
+            "test".to_string(),
+            CpuStats {
+                total: 1_000_000,
+                system: 5_000_000,
+            },
+        );
+
+        let (usage, measurement) = cpu_usage("test", Some(&stats), &prev);
+        // current.total == previous.total triggers restart detection
+        assert!(usage.is_none());
+        assert!(measurement.is_some());
+    }
+
+    #[test]
+    fn test_memory_usage_normal() {
+        let stats = ContainerMemoryStats {
+            usage: Some(512_000_000),
+            stats: Some(HashMap::from([("inactive_file".to_string(), 100_000_000)])),
+            ..Default::default()
+        };
+        assert_eq!(calculate_memory_usage(Some(&stats)), Some(412_000_000));
+    }
+
+    #[test]
+    fn test_memory_usage_no_inactive_file() {
+        let stats = ContainerMemoryStats {
+            usage: Some(512_000_000),
+            stats: Some(HashMap::new()),
+            ..Default::default()
+        };
+        assert_eq!(calculate_memory_usage(Some(&stats)), Some(512_000_000));
+    }
+
+    #[test]
+    fn test_memory_usage_none_stats() {
+        assert_eq!(calculate_memory_usage(None), None);
+    }
+
+    #[test]
+    fn test_memory_usage_missing_usage_field() {
+        let stats = ContainerMemoryStats {
+            usage: None,
+            stats: Some(HashMap::from([("inactive_file".to_string(), 100)])),
+            ..Default::default()
+        };
+        assert_eq!(calculate_memory_usage(Some(&stats)), None);
+    }
+
+    #[test]
+    fn test_memory_usage_missing_stats_map() {
+        let stats = ContainerMemoryStats {
+            usage: Some(512_000_000),
+            stats: None,
+            ..Default::default()
+        };
+        assert_eq!(calculate_memory_usage(Some(&stats)), None);
+    }
+
+    #[test]
+    fn test_network_usage_multiple_interfaces() {
+        let networks = HashMap::from([
+            (
+                "eth0".to_string(),
+                ContainerNetworkStats {
+                    rx_bytes: Some(1_000),
+                    tx_bytes: Some(2_000),
+                    ..Default::default()
+                },
+            ),
+            (
+                "eth1".to_string(),
+                ContainerNetworkStats {
+                    rx_bytes: Some(3_000),
+                    tx_bytes: Some(4_000),
+                    ..Default::default()
+                },
+            ),
+        ]);
+
+        let (rx, tx) = calculate_network_usage(Some(&networks));
+        assert_eq!(rx, Some(4_000));
+        assert_eq!(tx, Some(6_000));
+    }
+
+    #[test]
+    fn test_network_usage_none() {
+        let (rx, tx) = calculate_network_usage(None);
+        assert!(rx.is_none());
+        assert!(tx.is_none());
+    }
+
+    #[test]
+    fn test_network_usage_empty_map() {
+        let networks = HashMap::new();
+        let (rx, tx) = calculate_network_usage(Some(&networks));
+        assert_eq!(rx, Some(0));
+        assert_eq!(tx, Some(0));
+    }
+
+    #[test]
+    fn test_container_name_strips_leading_slash() {
+        let container = ContainerSummary {
+            names: Some(vec!["/my-container".to_string()]),
+            ..Default::default()
+        };
+        assert_eq!(container_name(&container), "my-container");
+    }
+
+    #[test]
+    fn test_container_name_falls_back_to_id() {
+        let container = ContainerSummary {
+            names: None,
+            id: Some("abc123def456".to_string()),
+            ..Default::default()
+        };
+        assert_eq!(container_name(&container), "abc123def456");
+    }
+
+    #[test]
+    fn test_container_name_falls_back_to_na() {
+        let container = ContainerSummary {
+            names: None,
+            id: None,
+            ..Default::default()
+        };
+        assert_eq!(container_name(&container), "n/a");
+    }
+}
