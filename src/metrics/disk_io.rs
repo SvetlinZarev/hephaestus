@@ -48,7 +48,7 @@ struct Metrics {
 }
 
 impl Metrics {
-    pub fn new(state: Measurement<DiskIoStats>) -> anyhow::Result<Self> {
+    fn new(state: Measurement<DiskIoStats>) -> anyhow::Result<Self> {
         let labels = vec!["device".to_owned()];
 
         let bytes_read = Desc::new(

@@ -43,7 +43,7 @@ pub trait DataSource {
     fn network_io(&self) -> impl Future<Output = anyhow::Result<NetworkIoStats>> + Send;
 }
 #[derive(Clone)]
-pub struct Metrics {
+struct Metrics {
     state: Measurement<NetworkIoStats>,
     bytes_sent: Desc,
     bytes_received: Desc,
@@ -52,7 +52,7 @@ pub struct Metrics {
 }
 
 impl Metrics {
-    pub fn new(state: Measurement<NetworkIoStats>) -> anyhow::Result<Self> {
+    fn new(state: Measurement<NetworkIoStats>) -> anyhow::Result<Self> {
         let labels = vec!["device".to_string()];
         Ok(Self {
             state,

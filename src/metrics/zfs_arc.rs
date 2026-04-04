@@ -44,7 +44,7 @@ struct Metrics {
 }
 
 impl Metrics {
-    pub fn new(state: Measurement<ArcStats>) -> anyhow::Result<Self> {
+    fn new(state: Measurement<ArcStats>) -> anyhow::Result<Self> {
         let labels = HashMap::new();
 
         Ok(Self {

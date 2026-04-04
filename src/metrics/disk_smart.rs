@@ -108,7 +108,7 @@ pub trait DataSource {
 }
 
 #[derive(Clone)]
-pub struct Metrics {
+struct Metrics {
     state: Measurement<SmartReports>,
 
     sata_temp: Desc,
@@ -137,7 +137,7 @@ pub struct Metrics {
 }
 
 impl Metrics {
-    pub fn new(state: Measurement<SmartReports>) -> anyhow::Result<Self> {
+    fn new(state: Measurement<SmartReports>) -> anyhow::Result<Self> {
         let labels = vec!["device".into(), "model".into(), "serial_number".into()];
 
         Ok(Self {

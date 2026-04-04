@@ -48,7 +48,7 @@ pub trait DataSource {
 }
 
 #[derive(Clone)]
-pub struct Metrics {
+struct Metrics {
     state: Measurement<UpsStats>,
     runtime: Desc,
     battery_level: Desc,
@@ -62,7 +62,7 @@ pub struct Metrics {
 }
 
 impl Metrics {
-    pub fn new(state: Measurement<UpsStats>) -> anyhow::Result<Self> {
+    fn new(state: Measurement<UpsStats>) -> anyhow::Result<Self> {
         let labels = vec!["ups".to_string()];
         let runtime = Desc::new(
             "system_ups_runtime_seconds".into(),
