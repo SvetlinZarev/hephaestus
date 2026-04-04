@@ -1,9 +1,9 @@
 use crate::domain::{Collector, Metric};
 use crate::metrics::no_operation::NoOpCollector;
 use crate::metrics::util::{into_labels, maybe_counter, update_measurement_if};
-use prometheus::Registry;
 use prometheus::core::Desc;
 use prometheus::proto::{LabelPair, MetricFamily};
+use prometheus::Registry;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -224,5 +224,79 @@ where
         });
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    struct NoopDataSource;
+
+    impl DataSource for NoopDataSource {
+        async fn network_io(&self) -> anyhow::Result<NetworkIoStats> {
+            unimplemented!()
+        }
+    }
+
+    fn collector_with_config(config: Config) -> NetworkIoCollector<NoopDataSource> {
+        NetworkIoCollector {
+            config,
+            measurement: Arc::new(Mutex::new(None)),
+            data_source: NoopDataSource,
+        }
+    }
+
+    #[test]
+    fn test_should_collect_with_watch_list() {
+        let config = Config {
+            enabled: true,
+            watch_interfaces: Some(vec!["eth0".to_string()]),
+            ignore_interfaces: None,
+        };
+        let c = collector_with_config(config);
+        assert!(c.should_collect("eth0"));
+        assert!(!c.should_collect("lo"));
+        assert!(!c.should_collect("eth1"));
+    }
+
+    #[test]
+    fn test_should_collect_with_ignore_list() {
+        let config = Config {
+            enabled: true,
+            watch_interfaces: None,
+            ignore_interfaces: Some(vec!["lo".to_string()]),
+        };
+        let c = collector_with_config(config);
+        assert!(!c.should_collect("lo"));
+        assert!(c.should_collect("eth0"));
+        assert!(c.should_collect("bond0"));
+    }
+
+    #[test]
+    fn test_should_collect_no_filters() {
+        let config = Config {
+            enabled: true,
+            watch_interfaces: None,
+            ignore_interfaces: None,
+        };
+        let c = collector_with_config(config);
+        assert!(c.should_collect("lo"));
+        assert!(c.should_collect("eth0"));
+        assert!(c.should_collect("anything"));
+    }
+
+    #[test]
+    fn test_watch_takes_precedence_over_ignore() {
+        let config = Config {
+            enabled: true,
+            watch_interfaces: Some(vec!["eth0".to_string()]),
+            ignore_interfaces: Some(vec!["eth0".to_string()]),
+        };
+
+        // When watch_interfaces is set, ignore_interfaces is not checked
+        // watch_interfaces wins — eth0 is in the watch list
+        let c = collector_with_config(config);
+        assert!(c.should_collect("eth0"));
     }
 }
