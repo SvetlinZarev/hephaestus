@@ -83,11 +83,6 @@ impl Metrics {
         })
     }
 
-    pub fn register(&self, registry: &Registry) -> anyhow::Result<()> {
-        registry.register(Box::new(self.clone()))?;
-        Ok(())
-    }
-
     fn make_labels(&self, device: &InterfaceStats) -> Vec<LabelPair> {
         into_labels(&[("device", &device.interface)])
     }
@@ -157,7 +152,7 @@ where
         let collector = NetworkIoCollector::new(self.config, self.data_source);
 
         let metrics = Metrics::new(collector.measurement.clone())?;
-        metrics.register(registry)?;
+        registry.register(Box::new(metrics))?;
 
         Ok(Box::new(collector))
     }

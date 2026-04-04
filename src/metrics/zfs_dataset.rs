@@ -79,11 +79,6 @@ impl Metrics {
             )?,
         })
     }
-
-    pub fn register(&self, registry: &Registry) -> anyhow::Result<()> {
-        registry.register(Box::new(self.clone()))?;
-        Ok(())
-    }
 }
 
 impl prometheus::core::Collector for Metrics {
@@ -140,7 +135,7 @@ where
 
         let collector = ZfsDatasetIoCollector::new(self.data_source);
         let metrics = Metrics::new(collector.measurement.clone())?;
-        metrics.register(registry)?;
+        registry.register(Box::new(metrics))?;
 
         Ok(Box::new(collector))
     }
