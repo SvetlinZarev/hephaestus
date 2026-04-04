@@ -1,12 +1,11 @@
 use crate::domain::{Collector, Metric};
 use crate::metrics::no_operation::NoOpCollector;
-use crate::metrics::util::{maybe_counter, maybe_gauge, update_measurement_if};
+use crate::metrics::util::{Measurement, maybe_counter, maybe_gauge};
 use prometheus::Registry;
 use prometheus::core::Desc;
 use prometheus::proto::MetricFamily;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
 use tokio::time::Instant;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -36,7 +35,7 @@ pub trait DataSource {
 
 #[derive(Clone)]
 struct Metrics {
-    state: Arc<Mutex<Option<ArcStats>>>,
+    state: Measurement<ArcStats>,
     hits: Desc,
     misses: Desc,
     size: Desc,
@@ -45,7 +44,7 @@ struct Metrics {
 }
 
 impl Metrics {
-    pub fn new(state: Arc<Mutex<Option<ArcStats>>>) -> anyhow::Result<Self> {
+    pub fn new(state: Measurement<ArcStats>) -> anyhow::Result<Self> {
         let labels = HashMap::new();
 
         Ok(Self {
@@ -116,7 +115,7 @@ where
         }
 
         let collector = ZfsCollector::new(self.data_source);
-        let metrics = Metrics::new(collector.measurements())?;
+        let metrics = Metrics::new(collector.measurement.clone())?;
         metrics.register(registry)?;
 
         Ok(Box::new(collector))
@@ -124,7 +123,7 @@ where
 }
 
 struct ZfsCollector<T> {
-    measurement: Arc<Mutex<Option<ArcStats>>>,
+    measurement: Measurement<ArcStats>,
     data_source: T,
 }
 
@@ -134,13 +133,9 @@ where
 {
     fn new(data_source: T) -> Self {
         Self {
-            measurement: Arc::new(Mutex::new(None)),
+            measurement: Measurement::new(),
             data_source,
         }
-    }
-
-    fn measurements(&self) -> Arc<Mutex<Option<ArcStats>>> {
-        Arc::clone(&self.measurement)
     }
 }
 
@@ -158,9 +153,8 @@ where
             .inspect_err(|e| tracing::error!(error=?e, "Failed to collect ZFS ARC statistics"))
             .ok();
 
-        update_measurement_if(&self.measurement, stats, |old, new| {
-            old.timestamp < new.timestamp
-        });
+        self.measurement
+            .update_if(stats, |old, new| old.timestamp < new.timestamp);
 
         Ok(())
     }
@@ -178,25 +172,24 @@ impl prometheus::core::Collector for Metrics {
     }
 
     fn collect(&self) -> Vec<MetricFamily> {
-        let guard = self.state.lock().unwrap_or_else(|e| e.into_inner());
-        let Some(stats) = guard.as_ref() else {
-            return vec![];
-        };
+        self.state
+            .read(|stats| {
+                let mut mf = Vec::new();
+                let l = vec![];
 
-        let mut mf = Vec::new();
-        let l = vec![];
+                maybe_counter(&mut mf, &self.hits, &l, Some(stats.hits));
+                maybe_counter(&mut mf, &self.misses, &l, Some(stats.misses));
+                maybe_gauge(&mut mf, &self.size, &l, Some(stats.size as f64));
+                maybe_gauge(
+                    &mut mf,
+                    &self.target_size,
+                    &l,
+                    Some(stats.target_size as f64),
+                );
+                maybe_gauge(&mut mf, &self.max_size, &l, Some(stats.max_size as f64));
 
-        maybe_counter(&mut mf, &self.hits, &l, Some(stats.hits));
-        maybe_counter(&mut mf, &self.misses, &l, Some(stats.misses));
-        maybe_gauge(&mut mf, &self.size, &l, Some(stats.size as f64));
-        maybe_gauge(
-            &mut mf,
-            &self.target_size,
-            &l,
-            Some(stats.target_size as f64),
-        );
-        maybe_gauge(&mut mf, &self.max_size, &l, Some(stats.max_size as f64));
-
-        mf
+                mf
+            })
+            .unwrap_or_default()
     }
 }

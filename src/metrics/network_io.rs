@@ -1,12 +1,11 @@
 use crate::domain::{Collector, Metric};
 use crate::metrics::no_operation::NoOpCollector;
-use crate::metrics::util::{into_labels, maybe_counter, update_measurement_if};
+use crate::metrics::util::{Measurement, into_labels, maybe_counter};
 use prometheus::Registry;
 use prometheus::core::Desc;
 use prometheus::proto::{LabelPair, MetricFamily};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
 use tokio::time::Instant;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -45,7 +44,7 @@ pub trait DataSource {
 }
 #[derive(Clone)]
 pub struct Metrics {
-    state: Arc<Mutex<Option<NetworkIoStats>>>,
+    state: Measurement<NetworkIoStats>,
     bytes_sent: Desc,
     bytes_received: Desc,
     packets_sent: Desc,
@@ -53,7 +52,7 @@ pub struct Metrics {
 }
 
 impl Metrics {
-    pub fn new(state: Arc<Mutex<Option<NetworkIoStats>>>) -> anyhow::Result<Self> {
+    pub fn new(state: Measurement<NetworkIoStats>) -> anyhow::Result<Self> {
         let labels = vec!["device".to_string()];
         Ok(Self {
             state,
@@ -105,31 +104,29 @@ impl prometheus::core::Collector for Metrics {
     }
 
     fn collect(&self) -> Vec<MetricFamily> {
-        let guard = self.state.lock().unwrap_or_else(|e| e.into_inner());
-        let Some(stats) = guard.as_ref() else {
-            return vec![];
-        };
-
-        let mut mf = vec![];
-        for device in &stats.interfaces {
-            let l = self.make_labels(device);
-            maybe_counter(&mut mf, &self.bytes_sent, &l, Some(device.bytes_sent));
-            maybe_counter(
-                &mut mf,
-                &self.bytes_received,
-                &l,
-                Some(device.bytes_received),
-            );
-            maybe_counter(&mut mf, &self.packets_sent, &l, Some(device.packets_sent));
-            maybe_counter(
-                &mut mf,
-                &self.packets_received,
-                &l,
-                Some(device.packets_received),
-            );
-        }
-
-        mf
+        self.state
+            .read(|stats| {
+                let mut mf = vec![];
+                for device in &stats.interfaces {
+                    let l = self.make_labels(device);
+                    maybe_counter(&mut mf, &self.bytes_sent, &l, Some(device.bytes_sent));
+                    maybe_counter(
+                        &mut mf,
+                        &self.bytes_received,
+                        &l,
+                        Some(device.bytes_received),
+                    );
+                    maybe_counter(&mut mf, &self.packets_sent, &l, Some(device.packets_sent));
+                    maybe_counter(
+                        &mut mf,
+                        &self.packets_received,
+                        &l,
+                        Some(device.packets_received),
+                    );
+                }
+                mf
+            })
+            .unwrap_or_default()
     }
 }
 pub struct NetworkIo<T> {
@@ -158,9 +155,8 @@ where
         }
 
         let collector = NetworkIoCollector::new(self.config, self.data_source);
-        let measurements = collector.measurements();
 
-        let metrics = Metrics::new(measurements)?;
+        let metrics = Metrics::new(collector.measurement.clone())?;
         metrics.register(registry)?;
 
         Ok(Box::new(collector))
@@ -169,7 +165,7 @@ where
 
 struct NetworkIoCollector<T> {
     config: Config,
-    measurement: Arc<Mutex<Option<NetworkIoStats>>>,
+    measurement: Measurement<NetworkIoStats>,
     data_source: T,
 }
 
@@ -178,12 +174,8 @@ impl<T> NetworkIoCollector<T> {
         Self {
             config,
             data_source,
-            measurement: Arc::new(Mutex::new(None)),
+            measurement: Measurement::new(),
         }
-    }
-
-    fn measurements(&self) -> Arc<Mutex<Option<NetworkIoStats>>> {
-        Arc::clone(&self.measurement)
     }
 
     fn should_collect(&self, interface_name: &str) -> bool {
@@ -219,9 +211,8 @@ where
             .inspect_err(|e| tracing::error!(error=?e, "Failed to collect network IO statistics"))
             .ok();
 
-        update_measurement_if(&self.measurement, stats, |old, new| {
-            old.timestamp < new.timestamp
-        });
+        self.measurement
+            .update_if(stats, |old, new| old.timestamp < new.timestamp);
 
         Ok(())
     }
@@ -242,7 +233,7 @@ mod tests {
     fn collector_with_config(config: Config) -> NetworkIoCollector<NoopDataSource> {
         NetworkIoCollector {
             config,
-            measurement: Arc::new(Mutex::new(None)),
+            measurement: Measurement::new(),
             data_source: NoopDataSource,
         }
     }
