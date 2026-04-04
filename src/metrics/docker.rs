@@ -134,9 +134,7 @@ where
         }
 
         let collector = DockerCollector::new(self.data_source);
-
-        let metrics = Metrics::new(collector.measurement.clone())?;
-        registry.register(Box::new(metrics))?;
+        registry.register(Box::new(collector.metrics()?))?;
 
         Ok(Box::new(collector))
     }
@@ -156,6 +154,10 @@ where
             measurement: Measurement::new(),
             data_source,
         }
+    }
+
+    fn metrics(&self) -> anyhow::Result<Metrics> {
+        Metrics::new(self.measurement.clone())
     }
 }
 
