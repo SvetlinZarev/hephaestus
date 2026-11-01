@@ -23,7 +23,7 @@ config = { version = "0.15", default-features = false, features = ["toml", "json
 # SerDe
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-toml = "0.9"
+toml = "1.1.8+spec-1.1.0"
 
 # Logging
 tracing = "0.1"
@@ -33,7 +33,7 @@ tracing-appender = "0.2"
 # Web
 axum = { version = "0.8", default-features = false, features = ["tokio", "tracing", "http1"] }
 tower = "0.5"
-tower-http = { version = "0.6", features = ["timeout", "trace", "catch-panic", "normalize-path", "request-id"] }
+tower-http = { version = "0.7.1", features = ["timeout", "trace", "catch-panic", "normalize-path", "request-id"] }
 
 # Metrics
 prometheus = "0.14.0"
