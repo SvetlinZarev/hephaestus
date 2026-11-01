@@ -165,7 +165,7 @@ impl DataSource for Nut {
     async fn ups_stats(&self) -> anyhow::Result<UpsStats> {
         let mut stream = TcpStream::connect(&self.addr)
             .await
-            .with_context(|| format!("Failed to connect to NUT server at [{}]", &self.addr))?;
+            .with_context(|| format!("Failed to connect to NUT server at [{}]", self.addr))?;
 
         let (reader, mut writer) = stream.split();
         let mut reader = BufReader::new(reader);
